@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const StudySession = require('../models/StudySession');
+const User = require('../models/User');
 
 // Route: POST /api/sessions
 // Allow a user to create a new study group
@@ -9,7 +10,17 @@ router.post('/', async (req, res) => {
     // Details of the study session from the customer's request
     const { title, course, date, location, createdBy } = req.body;
 
-    // Build the new session using our blueprint
+    // Verify whether it's an organizer who creates a session or not
+    const user = await User.findById(createdBy);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    if (user.role !== 'organizer') {
+      return res.status(403).json({
+        error: "Access denied, only organizers can create study sessions."
+      });
+    }
+
     const newSession = new StudySession({
       title: title,
       course: course,
@@ -84,4 +95,30 @@ router.put('/:id/join', async (req, res) => {
   }
 });
 
+// Route: GET /api/sessions/user/:userId
+// Fetch the sessions organized or attended for a specific user
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    //Find sessions matching EITHER condition
+    const mySessions = await StudySession.find({
+      $or: [
+        { createdBy: userId },  
+        { attendees: userId }        
+      ]
+    }).populate('createdBy', 'name email'); // see host real name
+
+    // 3. Return all sessions
+    res.status(200).json({
+      message: "Here is your upcoming schedule!",
+      count: mySessions.length, 
+      sessions: mySessions
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch your schedule." });
+  }
+});
 module.exports = router;
