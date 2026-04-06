@@ -9,7 +9,11 @@ const studySessionSchema = new mongoose.Schema({
     type: String, 
     required: true // e.g., "COMP307"
   },
-  date: { 
+  startTime: { 
+    type: Date, 
+    required: true 
+  },
+  endTime: { 
     type: Date, 
     required: true 
   },

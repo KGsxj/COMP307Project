@@ -8,7 +8,7 @@ const User = require('../models/User');
 router.post('/', async (req, res) => {
   try {
     // Details of the study session from the customer's request
-    const { title, course, date, location, createdBy } = req.body;
+    const { title, course, startTime, endTime, location, createdBy } = req.body;
 
     // Verify whether it's an organizer who creates a session or not
     const user = await User.findById(createdBy);
@@ -24,9 +24,10 @@ router.post('/', async (req, res) => {
     const newSession = new StudySession({
       title: title,
       course: course,
-      date: date,
+      startTime: startTime, 
+      endTime: endTime,     
       location: location,
-      createdBy: createdBy // id of user who created the group
+      createdBy: createdBy 
     });
 
     // Save it to the database
@@ -109,7 +110,7 @@ router.get('/user/:userId', async (req, res) => {
       ]
     }).populate('createdBy', 'name email'); // see host real name
 
-    // 3. Return all sessions
+    // Return all sessions
     res.status(200).json({
       message: "Here is your upcoming schedule!",
       count: mySessions.length, 
