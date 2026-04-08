@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['none', 'pending', 'approved', 'rejected'],
     default: 'none'
+  },
+  gpa: {
+    type: Number,
+    required: false
   }
 }, { timestamps: true });
 

@@ -37,58 +37,40 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Route: PUT /api/users/:id/upgrade
-// Ugrade a user's role from student to organizer 
-// (Can improve this function later to become a request instead of simply clicking the button)
-router.put('/:id/upgrade', async(req, res) => {
-  try {
-    const userId = req.params.id;
-
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { role: 'organizer'},
-      { returnDocument: 'after' }
-    );
-
-    if (!updatedUser) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    res.status(200).json({
-      message: "🎉 You are now an Organizer!",
-      user: {
-        id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to upgrade user role." });
-  }
-});
-
-
 // Route: PUT /api/users/:id/apply
-// A student requests to become an organizer
+// A student submit an application with a self-reported GPA for admin review
 router.put('/:id/apply', async (req, res) => {
   try {
     const userId = req.params.id;
+    const { gpa } = req.body
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { applicationStatus: 'pending' },
-      { returnDocument: 'after'}
-    );
+    const user = await User.findById(userId);
 
-    if (!updatedUser) {
+    if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
+
+    if (user.role === 'organizer') {
+      return res.status(400).json({ error: "You are already an organizer" });
+    }
+    if (user.applicationStatus === 'pending') {
+      return res.status(400).json({ error: "You already have an application pending." });
+    }
+
+    // Set status to pending for the Admin to review
+    user.applicationStatus = 'pending';
     
-    res.status(200).json({
-      message: "Application submitted! Please wait for admin approval.",
-      status: updatedUser.applicationStatus
+    // Save their submitted GPA if they provided one
+    if (gpa) {
+      user.gpa = Number(gpa); 
+    }
+
+    await user.save();
+
+    res.status(200).json({ 
+      message: "Application submitted! Please wait for admin approval.", 
+      status: user.applicationStatus,
+      gpaSubmitted: user.gpa || "None provided"
     });
   } catch (error) {
     console.error(error);
