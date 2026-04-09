@@ -24,10 +24,11 @@ const userSchema = new mongoose.Schema({
     enum: ['none', 'pending', 'approved', 'rejected'],
     default: 'none'
   },
-  gpa: {
-    type: Number,
-    required: false
-  }
+  courseRoles: [{
+    course: { type: String, required: true }, // e.g., "COMP307"
+    gpa: { type: Number, required: true },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }
+  }]
 }, { timestamps: true });
 
 

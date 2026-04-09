@@ -5,27 +5,23 @@ const User = require('../models/User'); // Import the blueprint we just made!
 // Route: POST /api/users/register
 // Create a brand new user in the database
 router.post('/register', async (req, res) => {
-  try {
-    // Grab user data
+ try {
     const { name, email, password } = req.body;
 
-    // define whether the user is a student or ta (organizer) by checking their email
-    let assignedRole = 'student';
-
-    if (email.endsWith('@mcgill.ca')) {
-      assignedRole = 'organizer';
+    if (!email.endsWith("mail.mcgill.ca") && !email.endsWith("mcgill.ca")) {
+      return res.status(400).json({ error: "Please enter a valid mcgill email." });
     }
 
+    // EVERYONE defaults to a student. TAs must apply via the /apply route.
     const newUser = new User({
       name: name,
       email: email,
       password: password,
-      role: assignedRole
-    })
+      role: 'student' 
+    });
 
     const savedUser = await newUser.save();
 
-    // Send a success message (and the saved data) back to the customer
     res.status(201).json({ 
         message: "✅ User created successfully!", 
         user: savedUser 
@@ -42,39 +38,48 @@ router.post('/register', async (req, res) => {
 router.put('/:id/apply', async (req, res) => {
   try {
     const userId = req.params.id;
-    const { gpa } = req.body
+    const { course, gpa } = req.body
+
+    if (!course || gpa === undefined) {
+        return res.status(400).json({ error: "Both course and gpa are required." });
+    }
 
     const user = await User.findById(userId);
-
     if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
 
-    if (user.role === 'organizer') {
-      return res.status(400).json({ error: "You are already an organizer" });
-    }
-    if (user.applicationStatus === 'pending') {
-      return res.status(400).json({ error: "You already have an application pending." });
-    }
-
-    // Set status to pending for the Admin to review
-    user.applicationStatus = 'pending';
+    const existingRole = user.courseRoles.find(r => r.course === course);
     
-    // Save their submitted GPA if they provided one
-    if (gpa) {
-      user.gpa = Number(gpa); 
+    if (existingRole) {
+        if (existingRole.status === 'approved') {
+            return res.status(400).json({ error: `You are already an organizer for ${course}.` });
+        }
+        if (existingRole.status === 'pending') {
+            return res.status(400).json({ error: `You already have a pending application for ${course}.` });
+        }
+        // If it was 'rejected', we allow them to re-apply and update the GPA/status
+        existingRole.status = 'pending';
+        existingRole.gpa = Number(gpa);
+    } else {
+        // If no existing application for this course, push a brand new one
+        user.courseRoles.push({
+            course: course,
+            gpa: Number(gpa),
+            status: 'pending'
+        });
     }
 
     await user.save();
 
     res.status(200).json({ 
-      message: "Application submitted! Please wait for admin approval.", 
-      status: user.applicationStatus,
-      gpaSubmitted: user.gpa || "None provided"
+      message: `Application submitted for ${course}!`, 
+      courseRoles: user.courseRoles 
     });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to submit application" });
+    res.status(500).json({ error: "Failed to submit application." });
   }
 });
 
@@ -82,52 +87,91 @@ router.put('/:id/apply', async (req, res) => {
 // Let an ADMIN see all pending requests
 router.get('/applications/pending', async (req, res) => {
   try {
-    const pendingUsers = await User.find({ applicationStatus: 'pending' }).select('-password');
+    // Search inside the array for the pending status
+    const pendingUsers = await User.find({
+      'courseRoles.status': 'pending'
+    }).select('name email courseRoles'); // Only send necessary fields to keep it fast
 
-    res.status(200).json({
-      message: "Here are the pending organizer applications:",
-      count: pendingUsers.length,
-      users: pendingUsers
-    });
+    res.status(200).json(pendingUsers);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to fetch applications." });
+    res.status(500).json({ error: "Failed to fetch pending applications." });
   }
 });
 
 // Route: PUT /api/users/:id/approve
-// An ADMIN approves a pending request
-router.put('/:id/approve', async (req, res) => {
+// An ADMIN approves a specific course for a user
+router.put('/:id/approve/:course', async (req, res) => {
   try {
-    const userId = req.params.id;
+    const { id, course } = req.params;
 
-    const approvedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        role: 'organizer',
-        applicationStatus: 'approved'
-      },
-      { returnDocument: 'after' }
-    );
-
-    if (!approvedUser) {
+    const user = await User.findById(id);
+    if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
 
+    // Find the exact course in their array
+    const roleIndex = user.courseRoles.findIndex(r => r.course === course);
+    
+    if (roleIndex === -1) {
+      return res.status(404).json({ error: `Application for ${course} not found.` });
+    }
+
+    // Change the status of that specific course
+    user.courseRoles[roleIndex].status = 'approved';
+
+    // The "VIP Pass" Upgrade: If they are a standard student, make them an Organizer globally
+    // so the frontend knows to show them the Organizer dashboards.
+    if (user.role === 'student') {
+      user.role = 'organizer';
+    }
+
+    await user.save();
+
     res.status(200).json({ 
-      message: "🎉 User has been approved and is now an Organizer!", 
-      user: {
-        name: approvedUser.name,
-        role: approvedUser.role,
-        status: approvedUser.applicationStatus
-      }
+      message: `User is now an approved Organizer for ${course}!`, 
+      courseRoles: user.courseRoles 
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to approve user." });
   }
 });
 
+// Route: PUT /api/users/:id/decline/:course
+// Admin rejects a specific course application
+router.put('/:id/decline/:course', async (req, res) => {
+  try {
+    const { id, course } = req.params;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // Find the exact course in their array
+    const roleIndex = user.courseRoles.findIndex(r => r.course === course);
+    
+    if (roleIndex === -1) {
+      return res.status(404).json({ error: `Application for ${course} not found.` });
+    }
+
+    // Change the status of that specific course to rejected
+    user.courseRoles[roleIndex].status = 'rejected';
+
+    await user.save();
+
+    res.status(200).json({ 
+      message: `Application for ${course} has been declined.`, 
+      courseRoles: user.courseRoles 
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to decline user." });
+  }
+});
 
 // Route: POST /api/users/login
 // Verify a user's credentials so they can access the app
