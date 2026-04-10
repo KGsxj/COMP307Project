@@ -38,15 +38,44 @@ router.post('/register', async (req, res) => {
 router.put('/:id/apply', async (req, res) => {
   try {
     const userId = req.params.id;
-    const { course, gpa } = req.body
+    const { course, gpa, taCode } = req.body
 
-    if (!course || gpa === undefined) {
-        return res.status(400).json({ error: "Both course and gpa are required." });
+    if (!course) {
+        return res.status(400).json({ error: "Course is required." });
+    }
+
+    // If they don't have the secret code, they must provide a GPA
+    if (!taCode && gpa === undefined) {
+        return res.status(400).json({ error: "GPA is required for student applications." });
     }
 
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found." });
+    }
+
+    let initialStatus = 'pending';
+    let finalGpa;
+
+    if (taCode) {
+        // 1. If they try to use a code, it MUST be correct
+        if (taCode !== "mcgill-ta-2026") {
+            return res.status(403).json({ error: "Invalid TA Access Code." });
+        }
+        // 2. It is correct! Give them the VIP Pass.
+        initialStatus = 'approved';
+        user.role = 'organizer';
+        finalGpa = 4.0; // Completely ignore whatever they typed in the GPA field
+    } else {
+        // No code provided, so they are a student. They MUST have a GPA.
+        if (gpa === undefined || gpa === null || gpa === "") {
+            return res.status(400).json({ error: "GPA is required for student applications." });
+        }
+        // Ensure what they typed is actually a number
+        finalGpa = Number(gpa);
+        if (isNaN(finalGpa)) {
+            return res.status(400).json({ error: "GPA must be a valid number." });
+        }
     }
 
     const existingRole = user.courseRoles.find(r => r.course === course);
@@ -58,23 +87,26 @@ router.put('/:id/apply', async (req, res) => {
         if (existingRole.status === 'pending') {
             return res.status(400).json({ error: `You already have a pending application for ${course}.` });
         }
-        // If it was 'rejected', we allow them to re-apply and update the GPA/status
-        existingRole.status = 'pending';
-        existingRole.gpa = Number(gpa);
+        
+        // Update existing rejected application
+        existingRole.status = initialStatus;
+        existingRole.gpa = finalGpa;
     } else {
-        // If no existing application for this course, push a brand new one
+        // Push brand new application
         user.courseRoles.push({
             course: course,
-            gpa: Number(gpa),
-            status: 'pending'
+            gpa: finalGpa,
+            status: initialStatus
         });
     }
 
     await user.save();
 
     res.status(200).json({ 
-      message: `Application submitted for ${course}!`, 
-      courseRoles: user.courseRoles 
+      message: initialStatus === 'approved' 
+        ? `TA Access granted! You are now an Organizer for ${course}.`
+        : `Application submitted for ${course}!`, 
+      courseRoles: user.courseRoles
     });
 
   } catch (error) {
