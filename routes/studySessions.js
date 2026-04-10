@@ -7,25 +7,23 @@ const User = require('../models/User');
 // Allow a user to create a new study group
 router.post('/', async (req, res) => {
   try {
-    // Details of the study session from the customer's request
-    const { title, course, startTime, endTime, location, createdBy } = req.body;
+    const { title, course, sessionType, startTime, endTime, location, createdBy } = req.body;
 
     if (!title || !course || !startTime || !endTime || !location || !createdBy) {
-      return res.status(400).json({ error: "All fields are required to create a session." });
+      return res.status(400).json({ error: "All required fields must be provided to create a session." });
     }
 
-    // Verify whether it's an organizer who creates a session or not
     const user = await User.findById(createdBy);
     if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
+
     // Global Role Check
     if (user.role !== 'organizer' && user.role !== 'admin') {
         return res.status(403).json({ error: "Only approved organizers can create sessions." });
     }
 
     if (user.role === 'organizer') {
-        // Look through their courseRoles array for an exact match and approved status
         const isApprovedForCourse = user.courseRoles.some(
             r => r.course === course && r.status === 'approved'
         );
@@ -38,15 +36,15 @@ router.post('/', async (req, res) => {
     }
 
     const newSession = new StudySession({
-      title: title,
-      course: course,
-      startTime: startTime, 
-      endTime: endTime,     
-      location: location,
-      createdBy: createdBy 
+      title,
+      course,
+      sessionType: sessionType || 'review', // Uses 'review' if frontend leaves it blank
+      startTime, 
+      endTime,     
+      location,
+      createdBy 
     });
 
-    // Save it to the database
     const savedSession = await newSession.save();
 
     res.status(201).json({ 
@@ -65,14 +63,24 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const sessionId = req.params.id;
+    
+    // Security Filter
+    const { startTime, endTime, location } = req.body; 
+    
+    const safeUpdates = {};
+    if (startTime) safeUpdates.startTime = startTime;
+    if (endTime) safeUpdates.endTime = endTime;
+    if (location) safeUpdates.location = location;
 
-    const { title, course, startTime, endTime, location } = req.body; 
+    if (Object.keys(safeUpdates).length === 0) {
+        return res.status(400).json({ error: "No valid fields provided for update." });
+    }
 
     const updatedSession = await StudySession.findByIdAndUpdate(
       sessionId,
-      { title, course, startTime, endTime, location },
-      { returnDocument: 'after' } 
-    );
+      { $set: safeUpdates },
+      { returnDocument: 'after', runValidators: true } 
+    ); 
 
     if (!updatedSession) {
       return res.status(404).json({ error: "Session not found." });
@@ -107,22 +115,6 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to cancel reservation." });
-  }
-});
-
-// Route: GET /api/sessions
-// Fetch all study sessions so they can be displayed on the screen
-router.get('/', async (req, res) => {
-  try {
-    // find all study sessions
-    const sessions = await StudySession.find().populate('createdBy', 'name email');
-    
-    // Send the list back to the customer
-    res.status(200).json(sessions);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch study sessions." });
   }
 });
 

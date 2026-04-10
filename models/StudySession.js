@@ -9,6 +9,12 @@ const studySessionSchema = new mongoose.Schema({
     type: String, 
     required: true // e.g., "COMP307"
   },
+  sessionType: {
+    type: String,
+    enum: ['review', 'office-hour'],
+    required: true,
+    default: 'review'
+  },
   startTime: { 
     type: Date, 
     required: true 
