@@ -3,6 +3,20 @@ const router = express.Router();
 const StudySession = require('../models/StudySession');
 const User = require('../models/User');
 
+// Route: GET /api/sessions
+// Fetch all study sessions
+router.get('/', async (req, res) => {
+  try {
+    const sessions = await StudySession.find()
+      .populate('createdBy', 'name email');
+
+    res.status(200).json(sessions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch study sessions.' });
+  }
+});
+
 // Route: POST /api/sessions
 // Allow a user to create a new study group
 router.post('/', async (req, res) => {
@@ -20,36 +34,36 @@ router.post('/', async (req, res) => {
 
     // Global Role Check
     if (user.role !== 'organizer' && user.role !== 'admin') {
-        return res.status(403).json({ error: "Only approved organizers can create sessions." });
+      return res.status(403).json({ error: "Only approved organizers can create sessions." });
     }
 
     if (user.role === 'organizer') {
-        const isApprovedForCourse = user.courseRoles.some(
-            r => r.course === course && r.status === 'approved'
-        );
+      const isApprovedForCourse = user.courseRoles.some(
+        r => r.course === course && r.status === 'approved'
+      );
 
-        if (!isApprovedForCourse) {
-            return res.status(403).json({ 
-                error: `Access Denied: You are not an approved Organizer for ${course}.` 
-            });
-        }
+      if (!isApprovedForCourse) {
+        return res.status(403).json({
+          error: `Access Denied: You are not an approved Organizer for ${course}.`
+        });
+      }
     }
 
     const newSession = new StudySession({
       title,
       course,
-      sessionType: sessionType || 'review', // Uses 'review' if frontend leaves it blank
-      startTime, 
-      endTime,     
+      sessionType: sessionType || 'review',
+      startTime,
+      endTime,
       location,
-      createdBy 
+      createdBy
     });
 
     const savedSession = await newSession.save();
 
-    res.status(201).json({ 
-      message: "📚 Study session created successfully!", 
-      session: savedSession 
+    res.status(201).json({
+      message: "📚 Study session created successfully!",
+      session: savedSession
     });
 
   } catch (error) {
@@ -59,36 +73,34 @@ router.post('/', async (req, res) => {
 });
 
 // Route: PUT /api/sessions/:id
-// Organizer modifies an existing reservation
+// Securely modify a session's time or location
 router.put('/:id', async (req, res) => {
   try {
     const sessionId = req.params.id;
-    
-    // Security Filter
-    const { startTime, endTime, location } = req.body; 
-    
+    const { startTime, endTime, location } = req.body;
+
     const safeUpdates = {};
     if (startTime) safeUpdates.startTime = startTime;
     if (endTime) safeUpdates.endTime = endTime;
     if (location) safeUpdates.location = location;
 
     if (Object.keys(safeUpdates).length === 0) {
-        return res.status(400).json({ error: "No valid fields provided for update." });
+      return res.status(400).json({ error: "No valid fields provided for update." });
     }
 
     const updatedSession = await StudySession.findByIdAndUpdate(
       sessionId,
       { $set: safeUpdates },
-      { returnDocument: 'after', runValidators: true } 
-    ); 
+      { new: true, runValidators: true }
+    );
 
     if (!updatedSession) {
       return res.status(404).json({ error: "Session not found." });
     }
 
-    res.status(200).json({ 
-      message: "Reservation modified successfully!", 
-      session: updatedSession 
+    res.status(200).json({
+      message: "Reservation modified successfully!",
+      session: updatedSession
     });
 
   } catch (error) {
@@ -96,7 +108,6 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ error: "Failed to modify reservation." });
   }
 });
-
 
 // Route: DELETE /api/sessions/:id
 // Organizer completely cancels/deletes a reservation
@@ -124,7 +135,6 @@ router.get('/organizer/:id', async (req, res) => {
   try {
     const organizerId = req.params.id;
 
-    // Search the database where 'createdBy' matches the Organizer's ID
     const sessions = await StudySession.find({ createdBy: organizerId })
       .populate('createdBy', 'name email');
 
@@ -136,49 +146,6 @@ router.get('/organizer/:id', async (req, res) => {
   }
 });
 
-// Route: PUT /api/sessions/:id
-// Securely modify a session's time or location
-router.put('/:id', async (req, res) => {
-  try {
-    const sessionId = req.params.id;
-    
-    // Security Fileter
-    // We strictly pull ONLY the fields we allow them to change
-    const { startTime, endTime, location } = req.body; 
-    
-    // Build a safe update object dynamically (ignores empty fields)
-    const safeUpdates = {};
-    if (startTime) safeUpdates.startTime = startTime;
-    if (endTime) safeUpdates.endTime = endTime;
-    if (location) safeUpdates.location = location;
-
-    // If they sent a request but didn't include any valid fields, block it
-    if (Object.keys(safeUpdates).length === 0) {
-        return res.status(400).json({ error: "No valid fields provided for update." });
-    }
-
-    const updatedSession = await StudySession.findByIdAndUpdate(
-      sessionId,
-      { $set: safeUpdates },
-      { new: true, runValidators: true } 
-    ); 
-
-    if (!updatedSession) {
-      return res.status(404).json({ error: "Session not found." });
-    }
-
-
-    res.status(200).json({ 
-      message: "Reservation modified successfully!", 
-      session: updatedSession 
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to modify reservation." });
-  }
-});
-
 // Route: PUT /api/sessions/:id/join
 // Add a user to the attendees list of a specific session
 router.put('/:id/join', async (req, res) => {
@@ -187,32 +154,28 @@ router.put('/:id/join', async (req, res) => {
     const { userId } = req.body;
 
     if (!userId) {
-        return res.status(400).json({ error: "User ID is required to join a session." });
+      return res.status(400).json({ error: "User ID is required to join a session." });
     }
 
-    // check if the session exists to give a good error message
     const sessionExists = await StudySession.findById(sessionId);
     if (!sessionExists) {
-        return res.status(404).json({ error: "Study session not found." });
+      return res.status(404).json({ error: "Study session not found." });
     }
 
-    // We map over the array to turn the ObjectIds into Strings before comparing
     const isAlreadyRegistered = sessionExists.attendees.some(id => id.toString() === userId);
     if (isAlreadyRegistered) {
-        return res.status(400).json({ error: "You are already registered for this session." });
+      return res.status(400).json({ error: "You are already registered for this session." });
     }
 
-
-    // Safely pushes the ID into the array without race conditions
     const updatedSession = await StudySession.findByIdAndUpdate(
-        sessionId,
-        { $addToSet: { attendees: userId } },
-        { returnDocument: 'after' } 
+      sessionId,
+      { $addToSet: { attendees: userId } },
+      { new: true }
     );
 
-    res.status(200).json({ 
-      message: "🎉 Successfully joined the study session!", 
-      session: updatedSession 
+    res.status(200).json({
+      message: "🎉 Successfully joined the study session!",
+      session: updatedSession
     });
 
   } catch (error) {
@@ -227,18 +190,16 @@ router.get('/user/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    //Find sessions matching EITHER condition
     const mySessions = await StudySession.find({
       $or: [
-        { createdBy: userId },  
-        { attendees: userId }        
+        { createdBy: userId },
+        { attendees: userId }
       ]
-    }).populate('createdBy', 'name email'); // see host real name
+    }).populate('createdBy', 'name email');
 
-    // Return all sessions
     res.status(200).json({
       message: "Here is your upcoming schedule!",
-      count: mySessions.length, 
+      count: mySessions.length,
       sessions: mySessions
     });
 
@@ -247,4 +208,5 @@ router.get('/user/:userId', async (req, res) => {
     res.status(500).json({ error: "Failed to fetch your schedule." });
   }
 });
+
 module.exports = router;

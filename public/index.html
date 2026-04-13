@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UniSlot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <button id="brandHomeBtn" class="brand-word brand-button" type="button">
+        UniSlot
+      </button>
+
+      <div id="topbarUser" class="topbar-user hidden">
+        <img
+          id="topbarAvatar"
+          class="topbar-avatar-img"
+          src="userlogo.png"
+          alt="User logo"
+        />
+        <span id="topbarUserName"></span>
+      </div>
+    </header>
+
+    <div id="globalMessage" class="message hidden"></div>
+
+    <section id="authSection" class="auth-shell">
+      <div id="loginView" class="auth-view">
+        <h2 class="auth-title">LOGIN</h2>
+
+        <form id="loginForm" class="login-form">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" required />
+
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" required />
+
+          <button
+            type="button"
+            class="plain-link auth-link clickable-text"
+            data-auth-target="register"
+          >
+            Don’t have an account? Register now
+          </button>
+
+          <button
+            type="button"
+            class="plain-link auth-link clickable-text"
+            data-auth-target="reset"
+          >
+            Forget password
+          </button>
+
+          <div class="login-button-row">
+            <button type="submit" class="small-action-btn">Login</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="registerView" class="auth-view hidden">
+        <h2 class="auth-title">CREATE NEW ACCOUNT</h2>
+
+        <form id="registerForm" class="login-form">
+          <label for="registerName">Name</label>
+          <input id="registerName" type="text" required />
+
+          <label for="registerEmail">Email</label>
+          <input id="registerEmail" type="email" required />
+
+          <label for="registerPassword">Password</label>
+          <input id="registerPassword" type="password" required />
+
+          <button
+            type="button"
+            class="plain-link auth-link clickable-text"
+            data-auth-target="login"
+          >
+            Return to login
+          </button>
+
+          <div class="login-button-row">
+            <button type="submit" class="small-action-btn">Register</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="resetView" class="auth-view hidden">
+        <h2 class="auth-title">Reset your password</h2>
+
+        <form id="resetForm" class="login-form">
+          <label for="resetEmail">Email</label>
+          <input id="resetEmail" type="email" required />
+
+          <div class="login-button-row">
+            <button type="submit" class="small-action-btn">Send email</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="resetSentView" class="auth-view hidden">
+        <div class="reset-sent-text">An Email has been sent.</div>
+
+        <button
+          type="button"
+          class="plain-link auth-link clickable-text"
+          data-auth-target="login"
+        >
+          Return to login
+        </button>
+      </div>
+    </section>
+
+    <section id="appSection" class="app-shell hidden">
+      <div class="page-top-row">
+        <div id="pageTopLeft" class="page-top-left">
+          <div class="section-title">New reservations</div>
+
+          <div class="dropdown-card">
+            <button
+              id="subjectDropdownToggle"
+              class="dropdown-header dropdown-button"
+              type="button"
+            >
+              <span>Choose your subject</span>
+              <span id="dropdownChevron">∨</span>
+            </button>
+
+            <div id="newReservationList" class="dropdown-list hidden"></div>
+          </div>
+        </div>
+
+        <div id="topActionBox" class="action-box"></div>
+      </div>
+
+      <section id="studentHomeView" class="app-view hidden">
+        <div class="table-title">Ongoing Reservations</div>
+
+        <div class="reservation-table-wrapper">
+          <table class="reservation-table">
+            <thead>
+              <tr>
+                <th>Subjects</th>
+                <th>Course</th>
+                <th>Host</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Location/Link</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="studentReservationsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="organizerHomeView" class="app-view hidden">
+        <div class="table-title">Ongoing Reservations</div>
+
+        <div class="reservation-table-wrapper">
+          <table class="reservation-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Course</th>
+                <th>Host</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Location/Link</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="organizerReservationsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="accountView" class="app-view hidden">
+        <div class="simple-page">
+          <div class="simple-page-title">Account</div>
+
+          <div class="account-layout">
+            <div class="account-logo-box">
+              <img
+                id="accountLogo"
+                class="account-logo-img"
+                src="userlogo.png"
+                alt="User logo"
+              />
+            </div>
+
+            <div class="account-details">
+              <div>Name: <span id="accountName"></span></div>
+              <div>Role: <span id="accountRole"></span></div>
+              <div>Email: <span id="accountEmail"></span></div>
+              <button class="plain-link underlined" disabled>Change password</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="studentOrganizerRequestView" class="app-view hidden">
+        <div class="simple-page">
+          <div class="request-title">Request to become an organizer</div>
+
+          <form id="organizerRequestForm" class="request-box-form">
+            <div class="request-big-box">
+              <div class="request-line">
+                <span class="request-label-inline">Name:</span>
+                <input id="organizerRequestName" type="text" readonly />
+              </div>
+
+              <div class="request-line">
+                <span class="request-label-inline">Class name:</span>
+                <input id="organizerRequestClass" type="text" />
+              </div>
+
+              <div class="request-line">
+                <span class="request-label-inline">GPA at that class:</span>
+                <input
+                  id="organizerRequestGpa"
+                  type="number"
+                  min="0"
+                  max="4.3"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <div class="request-confirm-row">
+              <button type="submit" class="big-confirm-btn">Confirm</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="taRequestView" class="app-view hidden">
+        <div class="simple-page">
+          <div class="request-title">Request to become an organizer</div>
+
+          <form id="taRequestForm" class="request-box-form">
+            <div class="request-big-box">
+              <div class="request-line">
+                <span class="request-label-inline">Name:</span>
+                <input id="taRequestName" type="text" readonly />
+              </div>
+
+              <div class="request-line">
+                <span class="request-label-inline">Class name:</span>
+                <input id="taRequestClass" type="text" />
+              </div>
+
+              <div class="request-line">
+                <span class="request-label-inline">TA code:</span>
+                <input id="taRequestCode" type="text" />
+              </div>
+            </div>
+
+            <div class="request-confirm-row">
+              <button type="submit" class="big-confirm-btn">Confirm</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="requestTutorStep1View" class="app-view hidden">
+        <div class="calendar-slot-page">
+          <div class="flow-label">*Request a tutor</div>
+
+          <div class="calendar-slot-columns">
+            <div>
+              <div class="calendar-title">Select date</div>
+              <div id="requestTutorCalendar" class="mock-calendar"></div>
+            </div>
+
+            <div>
+              <div class="calendar-title">
+                Select your desired time slot (up to three)
+              </div>
+              <div id="requestTutorSlots" class="slot-grid"></div>
+
+              <div class="confirm-row">
+                <button id="toTutorSelectionBtn" class="small-action-btn">
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="chooseTutorView" class="app-view hidden">
+        <div class="simple-page">
+          <div class="simple-page-title">Choose your Tutor</div>
+          <div id="tutorList" class="tutor-grid"></div>
+
+          <div class="confirm-row left">
+            <button id="toTutorMessageBtn" class="small-action-btn">
+              Confirm
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="tutorMessageView" class="app-view hidden">
+        <div class="simple-page">
+          <div class="confirm-row left">
+            <button id="submitTutorRequestBtn" class="small-action-btn">
+              Confirm
+            </button>
+          </div>
+
+          <div class="simple-page-title">
+            Message to the tutor (what do you need to reinforce? What are some of
+            your questions?)
+          </div>
+
+          <textarea id="tutorMessage"></textarea>
+        </div>
+      </section>
+
+      <section id="examReviewStudentView" class="app-view hidden">
+        <div class="calendar-slot-page">
+          <div class="flow-label">*Exam review</div>
+
+          <div class="calendar-slot-columns">
+            <div>
+              <div class="calendar-title">Select your available days</div>
+              <div id="examReviewStudentCalendar" class="mock-calendar"></div>
+            </div>
+
+            <div>
+              <div class="calendar-title">Select your time slot</div>
+              <div id="examReviewStudentSlots" class="slot-grid"></div>
+
+              <div class="confirm-row">
+                <button id="submitExamReviewStudentBtn" class="small-action-btn">
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="officeHourStudentView" class="app-view hidden">
+        <div class="calendar-slot-page">
+          <div class="flow-label">*Library drop-in/office hour</div>
+
+          <div class="calendar-slot-columns">
+            <div>
+              <div class="calendar-title">Select your available days</div>
+              <div id="officeHourStudentCalendar" class="mock-calendar"></div>
+            </div>
+
+            <div>
+              <div class="calendar-title">Select your time slot</div>
+              <div id="officeHourStudentSlots" class="slot-grid"></div>
+
+              <div class="confirm-row">
+                <button
+                  id="submitOfficeHourStudentBtn"
+                  class="small-action-btn"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="examReviewOrganizerView" class="app-view hidden">
+        <div class="calendar-slot-page">
+          <div class="flow-label">*Exam review</div>
+
+          <div class="calendar-slot-columns">
+            <div>
+              <div class="calendar-title">Select your available days</div>
+              <div id="examReviewOrganizerCalendar" class="mock-calendar"></div>
+            </div>
+
+            <div>
+              <div class="calendar-title">Select time slots</div>
+              <div id="examReviewOrganizerSlots" class="slot-grid"></div>
+
+              <div class="host-box">
+                <div>Host room:</div>
+                <div>Zoom link:</div>
+              </div>
+
+              <div class="confirm-row">
+                <button
+                  id="submitExamReviewOrganizerBtn"
+                  class="small-action-btn"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="officeHourOrganizerView" class="app-view hidden">
+        <div class="calendar-slot-page">
+          <div class="flow-label">*Library drop-in/office hour</div>
+
+          <div class="calendar-slot-columns">
+            <div>
+              <div class="calendar-title">Select your available days</div>
+              <div id="officeHourOrganizerCalendar" class="mock-calendar"></div>
+            </div>
+
+            <div>
+              <div class="calendar-title">Select time slots</div>
+              <div id="officeHourOrganizerSlots" class="slot-grid"></div>
+
+              <div class="host-box">
+                <div>Host room:</div>
+                <div>Zoom link:</div>
+              </div>
+
+              <div class="confirm-row">
+                <button
+                  id="submitOfficeHourOrganizerBtn"
+                  class="small-action-btn"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="successView" class="app-view hidden">
+        <div class="success-card">
+          <div class="success-card-title">Reservation successful</div>
+
+          <div id="successSummary" class="success-summary"></div>
+
+          <div class="success-card-actions">
+            <button id="successCancelBtn" class="success-action-btn" type="button">
+              Cancel reservation
+            </button>
+            <button id="successModifyBtn" class="success-action-btn" type="button">
+              Modify reservation
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="adminView" class="app-view hidden">
+        <div class="simple-page">
+          <div class="simple-page-title">*admin page</div>
+
+          <div class="admin-grid">
+            <div class="admin-apps">
+              <div class="admin-header-row">
+                <div>Name</div>
+                <div>GPA</div>
+                <div>Approve</div>
+                <div>Decline</div>
+              </div>
+              <div id="pendingApplicationsList"></div>
+            </div>
+
+            <div class="admin-course-box">
+              <div>Course</div>
+              <div>Comp303</div>
+              <div>Comp330</div>
+              <div>Math223</div>
+              <div>Comp421</div>
+              <div>Comp307</div>
+              <div>Comp250</div>
+              <button class="small-action-btn">Confirm</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <script src="script.js"></script>
+  </div>
+</body>
+</html>
