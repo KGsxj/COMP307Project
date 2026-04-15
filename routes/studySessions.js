@@ -184,6 +184,46 @@ router.put('/:id/join', async (req, res) => {
   }
 });
 
+// Route: PUT /api/sessions/:id/leave
+// Allow a student to cancel/leave a study session
+router.put('/:id/leave', async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const { userId } = req.body; 
+    if (!userId) {
+        return res.status(400).json({ error: "User ID is required to leave a session." });
+    }
+
+    // Verify the session exists
+    const sessionExists = await StudySession.findById(sessionId);
+    if (!sessionExists) {
+        return res.status(404).json({ error: "Study session not found." });
+    }
+
+    // Verify the user is actually registered first
+    const isRegistered = sessionExists.attendees.some(id => id.toString() === userId);
+    if (!isRegistered) {
+        return res.status(400).json({ error: "You are not currently registered for this session." });
+    }
+
+    // Safely remove the ID from the attendees array using $pull
+    const updatedSession = await StudySession.findByIdAndUpdate(
+        sessionId,
+        { $pull: { attendees: userId } },
+        { new: true } 
+    );
+
+    res.status(200).json({ 
+      message: "You have successfully left the study session.", 
+      session: updatedSession 
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to leave session." });
+  }
+});
+
 // Route: GET /api/sessions/user/:userId
 // Fetch the sessions organized or attended for a specific user
 router.get('/user/:userId', async (req, res) => {
