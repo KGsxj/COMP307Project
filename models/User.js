@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema({
     course: { type: String, required: true }, // e.g., "COMP307"
     gpa: { type: Number, required: true },
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }
+  }],
+  tutorRequests: [{
+    course: { type: String, required: true },
+    requestedTutor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    message: { type: String },
+    createdAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });
 

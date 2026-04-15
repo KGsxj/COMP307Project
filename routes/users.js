@@ -238,4 +238,61 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Route: GET /api/users/tutors/:course
+// Fetch all approved organizers for a specific course
+router.get('/tutors/:course', async (req, res) => {
+  try {
+    const course = req.params.course;
+
+    const tutors = await User.find({
+      $or: [{ role: 'organizer' }, { role: 'admin' }],
+      courseRoles: {
+        $elemMatch: { course: course, status: 'approved' }
+      }
+    }).select('name email'); // Only send back safe info
+
+    res.status(200).json(tutors);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch tutors." });
+  }
+});
+
+// Route: POST /api/users/request-tutor
+// Send a tutor request and save the message in the database
+router.post('/request-tutor', async (req, res) => {
+  try {
+    const { studentId, tutorId, course, message } = req.body;
+
+    if (!studentId || !tutorId || !course) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const student = await User.findById(studentId);
+    const tutor = await User.findById(tutorId);
+
+    if (!student || !tutor) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // SAVE TO DATABASE 
+    student.tutorRequests.push({
+        course: course,
+        requestedTutor: tutorId,
+        message: message || "No message provided."
+    });
+    await student.save();
+
+    res.status(200).json({ 
+      message: `Successfully sent your request to ${tutor.name}!`,
+      requests: student.tutorRequests 
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to send tutor request." });
+  }
+});
+
 module.exports = router;
