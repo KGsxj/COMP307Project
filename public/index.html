@@ -194,7 +194,9 @@
               <div>Name: <span id="accountName"></span></div>
               <div>Role: <span id="accountRole"></span></div>
               <div>Email: <span id="accountEmail"></span></div>
-              <button class="plain-link underlined" disabled>Change password</button>
+              <button id="changePasswordBtn" class="plain-link underlined clickable-text" type="button">
+                Change password
+              </button>
             </div>
           </div>
         </div>
@@ -206,20 +208,21 @@
 
           <form id="organizerRequestForm" class="request-box-form">
             <div class="request-big-box">
-              <div class="request-line">
-                <span class="request-label-inline">Name:</span>
-                <input id="organizerRequestName" type="text" readonly />
+              <div class="request-row-inline">
+                <span class="request-inline-label">Name:</span>
+                <input id="organizerRequestName" class="request-inline-input readonly-inline-input" type="text" readonly />
               </div>
 
-              <div class="request-line">
-                <span class="request-label-inline">Class name:</span>
-                <input id="organizerRequestClass" type="text" />
+              <div class="request-row-inline">
+                <span class="request-inline-label">Class name:</span>
+                <input id="organizerRequestClass" class="request-inline-input" type="text" />
               </div>
 
-              <div class="request-line">
-                <span class="request-label-inline">GPA at that class:</span>
+              <div class="request-row-inline">
+                <span class="request-inline-label">GPA at that class:</span>
                 <input
                   id="organizerRequestGpa"
+                  class="request-inline-input"
                   type="number"
                   min="0"
                   max="4.3"
@@ -241,19 +244,19 @@
 
           <form id="taRequestForm" class="request-box-form">
             <div class="request-big-box">
-              <div class="request-line">
-                <span class="request-label-inline">Name:</span>
-                <input id="taRequestName" type="text" readonly />
+              <div class="request-row-inline">
+                <span class="request-inline-label">Name:</span>
+                <input id="taRequestName" class="request-inline-input readonly-inline-input" type="text" readonly />
               </div>
 
-              <div class="request-line">
-                <span class="request-label-inline">Class name:</span>
-                <input id="taRequestClass" type="text" />
+              <div class="request-row-inline">
+                <span class="request-inline-label">Class name:</span>
+                <input id="taRequestClass" class="request-inline-input" type="text" />
               </div>
 
-              <div class="request-line">
-                <span class="request-label-inline">TA code:</span>
-                <input id="taRequestCode" type="text" />
+              <div class="request-row-inline">
+                <span class="request-inline-label">TA code:</span>
+                <input id="taRequestCode" class="request-inline-input" type="text" />
               </div>
             </div>
 
@@ -281,7 +284,7 @@
               <div id="requestTutorSlots" class="slot-grid"></div>
 
               <div class="confirm-row">
-                <button id="toTutorSelectionBtn" class="small-action-btn">
+                <button id="toTutorSelectionBtn" class="small-action-btn" type="button">
                   Confirm
                 </button>
               </div>
@@ -296,7 +299,7 @@
           <div id="tutorList" class="tutor-grid"></div>
 
           <div class="confirm-row left">
-            <button id="toTutorMessageBtn" class="small-action-btn">
+            <button id="toTutorMessageBtn" class="small-action-btn" type="button">
               Confirm
             </button>
           </div>
@@ -306,7 +309,7 @@
       <section id="tutorMessageView" class="app-view hidden">
         <div class="simple-page">
           <div class="confirm-row left">
-            <button id="submitTutorRequestBtn" class="small-action-btn">
+            <button id="submitTutorRequestBtn" class="small-action-btn" type="button">
               Confirm
             </button>
           </div>
@@ -335,7 +338,7 @@
               <div id="examReviewStudentSlots" class="slot-grid"></div>
 
               <div class="confirm-row">
-                <button id="submitExamReviewStudentBtn" class="small-action-btn">
+                <button id="submitExamReviewStudentBtn" class="small-action-btn" type="button">
                   Confirm
                 </button>
               </div>
@@ -359,10 +362,7 @@
               <div id="officeHourStudentSlots" class="slot-grid"></div>
 
               <div class="confirm-row">
-                <button
-                  id="submitOfficeHourStudentBtn"
-                  class="small-action-btn"
-                >
+                <button id="submitOfficeHourStudentBtn" class="small-action-btn" type="button">
                   Confirm
                 </button>
               </div>
@@ -385,16 +385,20 @@
               <div class="calendar-title">Select time slots</div>
               <div id="examReviewOrganizerSlots" class="slot-grid"></div>
 
-              <div class="host-box">
-                <div>Host room:</div>
-                <div>Zoom link:</div>
+              <div class="organizer-meta-box">
+                <label class="organizer-meta-line">
+                  <span>Host room:</span>
+                  <input id="examOrganizerHostRoom" type="text" placeholder="e.g. Redpath 361" />
+                </label>
+
+                <label class="organizer-meta-line">
+                  <span>Zoom link:</span>
+                  <input id="examOrganizerZoomLink" type="text" placeholder="e.g. https://zoom.us/..." />
+                </label>
               </div>
 
               <div class="confirm-row">
-                <button
-                  id="submitExamReviewOrganizerBtn"
-                  class="small-action-btn"
-                >
+                <button id="submitExamReviewOrganizerBtn" class="small-action-btn" type="button">
                   Confirm
                 </button>
               </div>
@@ -417,16 +421,20 @@
               <div class="calendar-title">Select time slots</div>
               <div id="officeHourOrganizerSlots" class="slot-grid"></div>
 
-              <div class="host-box">
-                <div>Host room:</div>
-                <div>Zoom link:</div>
+              <div class="organizer-meta-box">
+                <label class="organizer-meta-line">
+                  <span>Host room:</span>
+                  <input id="officeOrganizerHostRoom" type="text" placeholder="e.g. Redpath 361" />
+                </label>
+
+                <label class="organizer-meta-line">
+                  <span>Zoom link:</span>
+                  <input id="officeOrganizerZoomLink" type="text" placeholder="e.g. https://zoom.us/..." />
+                </label>
               </div>
 
               <div class="confirm-row">
-                <button
-                  id="submitOfficeHourOrganizerBtn"
-                  class="small-action-btn"
-                >
+                <button id="submitOfficeHourOrganizerBtn" class="small-action-btn" type="button">
                   Confirm
                 </button>
               </div>
@@ -468,19 +476,28 @@
             </div>
 
             <div class="admin-course-box">
-              <div>Course</div>
-              <div>Comp303</div>
-              <div>Comp330</div>
-              <div>Math223</div>
-              <div>Comp421</div>
-              <div>Comp307</div>
-              <div>Comp250</div>
-              <button class="small-action-btn">Confirm</button>
+              <div>Pending organizer applications</div>
             </div>
           </div>
         </div>
       </section>
     </section>
+
+    <div id="modifyModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-title">Modify reservation</div>
+
+        <label class="modal-field">
+          <span>Location / Link</span>
+          <input id="modifyLocationInput" type="text" />
+        </label>
+
+        <div class="modal-actions">
+          <button id="closeModifyModalBtn" class="small-action-btn" type="button">Close</button>
+          <button id="saveModifyModalBtn" class="small-action-btn" type="button">Save</button>
+        </div>
+      </div>
+    </div>
 
     <script src="script.js"></script>
   </div>

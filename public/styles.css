@@ -64,7 +64,7 @@ body {
 }
 
 .brand-button:hover {
-  opacity: 0.8;
+  opacity: 0.82;
 }
 
 .brand-button:focus {
@@ -84,7 +84,6 @@ body {
   height: 58px;
   object-fit: cover;
   border: 0;
-  background: transparent;
   display: block;
 }
 
@@ -128,7 +127,9 @@ body {
 
 .login-form input,
 .simple-form input,
-textarea {
+textarea,
+.organizer-meta-line input,
+.modal-field input {
   width: 100%;
   min-height: 56px;
   border: 2px solid var(--border);
@@ -187,32 +188,20 @@ textarea {
 }
 
 .page-top-row {
-  display: grid;
-  grid-template-columns: 255px 1fr 290px;
-  align-items: start;
+  display: flex;
+  align-items: flex-start;
   gap: 24px;
   margin-bottom: 18px;
 }
 
 .page-top-left {
-  grid-column: 1;
+  width: 255px;
+  flex: 0 0 255px;
 }
 
-.page-top-left.page-top-left-hidden {
+.page-top-left.hidden {
   visibility: hidden;
-}
-
-.action-box {
-  grid-column: 3;
-  min-width: 168px;
-  width: 100%;
-  max-width: 290px;
-  border: 2px solid var(--border);
-  background: transparent;
-  padding: 8px 8px 10px;
-  display: grid;
-  gap: 4px;
-  justify-self: end;
+  display: block !important;
 }
 
 .section-title,
@@ -254,7 +243,7 @@ textarea {
 
 .subject-option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   background: transparent;
   border: 0;
@@ -269,6 +258,8 @@ textarea {
   content: "-";
   display: inline-block;
   width: 14px;
+  flex: 0 0 14px;
+  text-decoration: none !important;
 }
 
 .subject-option span {
@@ -280,43 +271,42 @@ textarea {
   background: #bcbcbc;
 }
 
+.subject-option:hover span,
+.subject-option:focus span {
+  text-decoration: underline;
+}
+
 .clickable-text,
-.subject-option,
 .action-box button,
-.dropdown-button {
+.dropdown-button,
+.table-action-btn {
   cursor: pointer;
   transition: opacity 0.15s ease, text-decoration-color 0.15s ease;
 }
 
 .clickable-text:hover,
-.subject-option:hover,
-.action-box button:hover {
+.action-box button:hover,
+.table-action-btn:hover {
   text-decoration: underline;
 }
 
 .clickable-text:hover,
 .subject-option:hover,
 .action-box button:hover,
-.dropdown-button:hover {
+.dropdown-button:hover,
+.table-action-btn:hover {
   opacity: 0.75;
 }
 
-.table-action-btn {
+.action-box {
+  margin-left: auto;
+  width: 286px;
+  min-width: 286px;
+  border: 2px solid var(--border);
   background: transparent;
-  border: 0;
-  padding: 0;
-  color: #000;
-  font: inherit;
-  cursor: default;
-}
-
-.table-action-btn:focus,
-.subject-option:focus,
-.dropdown-button:focus,
-.action-box button:focus,
-.clickable-text:focus {
-  outline: 2px solid #666;
-  outline-offset: 2px;
+  padding: 8px 8px 10px;
+  display: grid;
+  gap: 4px;
 }
 
 .action-box button {
@@ -326,6 +316,23 @@ textarea {
   text-align: left;
   color: #000;
   font: inherit;
+}
+
+.table-action-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #000;
+  font: inherit;
+}
+
+.table-action-btn:focus,
+.subject-option:focus,
+.dropdown-button:focus,
+.action-box button:focus,
+.clickable-text:focus {
+  outline: 2px solid #666;
+  outline-offset: 2px;
 }
 
 .reservation-table-wrapper {
@@ -407,39 +414,43 @@ textarea {
   max-width: 1140px;
   margin: 0 auto;
   border: 2px solid var(--border);
-  padding: 14px 16px;
+  padding: 18px 20px;
   font-size: 22px;
+  display: grid;
+  gap: 18px;
 }
 
-.request-line {
+.request-row-inline {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 10px;
   flex-wrap: nowrap;
 }
 
-.request-line:last-child {
-  margin-bottom: 0;
-}
-
-.request-label-inline {
+.request-inline-label {
+  flex: 0 0 auto;
   font-size: 22px;
-  white-space: nowrap;
 }
 
-.request-line input {
-  border: 0;
-  min-height: 36px;
-  background: transparent;
-  padding: 0;
-  font: inherit;
+.request-inline-input {
   flex: 1 1 auto;
   min-width: 0;
+  border: 0 !important;
+  background: transparent !important;
+  min-height: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  font: inherit;
+  outline: none;
+  box-shadow: none;
 }
 
-.request-line input:focus {
+.request-inline-input:focus {
   outline: none;
+}
+
+.readonly-inline-input {
+  pointer-events: none;
 }
 
 .request-confirm-row {
@@ -482,6 +493,12 @@ textarea {
   font-size: 22px;
   text-align: center;
   margin-bottom: 18px;
+}
+
+.calendar-slot-columns > div:last-child .calendar-title {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .mock-calendar {
@@ -528,6 +545,8 @@ textarea {
   grid-template-columns: 1fr 1fr;
   gap: 20px 18px;
   max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .slot-btn {
@@ -547,14 +566,24 @@ textarea {
   background: var(--slot-fill);
 }
 
-.host-box {
+.organizer-meta-box {
   width: 100%;
-  max-width: 332px;
-  min-height: 84px;
+  max-width: 420px;
   border: 2px solid var(--border);
-  margin-top: 18px;
-  padding: 10px 12px;
+  padding: 12px;
+  margin: 18px auto 0;
+  display: grid;
+  gap: 12px;
+}
+
+.organizer-meta-line {
+  display: grid;
+  gap: 8px;
   font-size: 18px;
+}
+
+.organizer-meta-line input {
+  min-height: 40px;
 }
 
 .confirm-row {
@@ -642,6 +671,11 @@ textarea {
   border: 3px solid var(--border);
   background: transparent;
   font-size: 26px;
+  cursor: pointer;
+}
+
+.success-action-btn:disabled {
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -656,7 +690,7 @@ textarea {
 .admin-header-row,
 .admin-app-row {
   display: grid;
-  grid-template-columns: 1.3fr 0.8fr 0.8fr 0.8fr;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 0.8fr;
   gap: 12px;
   align-items: center;
 }
@@ -676,6 +710,45 @@ textarea {
   font-size: 22px;
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 520px;
+  background: #f5f5f5;
+  border: 2px solid var(--border);
+  padding: 22px;
+}
+
+.modal-title {
+  font-size: 28px;
+  margin-bottom: 18px;
+}
+
+.modal-field {
+  display: grid;
+  gap: 8px;
+  font-size: 20px;
+}
+
+.modal-field input {
+  min-height: 46px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 18px;
+}
+
 @media (max-width: 900px) {
   .topbar {
     height: auto;
@@ -691,7 +764,21 @@ textarea {
     width: min(760px, calc(100% - 40px));
   }
 
-  .page-top-row,
+  .page-top-row {
+    gap: 14px;
+  }
+
+  .page-top-left,
+  .action-box {
+    width: auto;
+    min-width: 0;
+  }
+
+  .page-top-left.hidden {
+    width: 0;
+    flex: 0 0 0;
+  }
+
   .account-layout,
   .calendar-slot-columns,
   .admin-grid {
@@ -699,14 +786,10 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .action-box {
-    grid-column: auto;
-    justify-self: start;
-  }
-
-  .page-top-left.page-top-left-hidden {
-    display: none !important;
-    visibility: hidden;
+  .request-row-inline {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .tutor-grid {

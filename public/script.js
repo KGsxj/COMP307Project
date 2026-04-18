@@ -1,9 +1,11 @@
 const API_BASE = "/api";
+const DEFAULT_COURSE = "COMP307";
+const currentYearMonthLabel = "2026/10";
 
 const state = {
   user: JSON.parse(localStorage.getItem("unislotUser") || "null"),
   mode: localStorage.getItem("unislotMode") || "student",
-  currentView: "studentHomeView",
+  currentView: localStorage.getItem("unislotCurrentView") || "studentHomeView",
   selectedSubject: null,
   selectedDate: 2,
   selectedTutorId: null,
@@ -12,17 +14,23 @@ const state = {
   selectedOfficeHourSlot: null,
   selectedOrganizerExamSlots: [],
   selectedOrganizerOfficeSlots: [],
-  latestConfirmation: ""
+  latestConfirmation: "",
+  availableSessions: [],
+  availableTutors: [],
+  lastReservation: null,
+  modifySessionId: null
 };
 
-const mockTutors = [
-  { id: "t1", name: "Jane Doe", course: "some class (comp 303, etc)", email: "Djane@mail.mcgill.ca" },
-  { id: "t2", name: "Jane Doe", course: "some class (comp 303, etc)", email: "Djane@mail.mcgill.ca" },
-  { id: "t3", name: "Jane Doe", course: "some class (comp 303, etc)", email: "Djane@mail.mcgill.ca" }
+const baseSlots = [
+  "9:00-10:00",
+  "10:00-11:00",
+  "11:00-12:00",
+  "12:00-13:00",
+  "13:00-14:00",
+  "14:00-15:00",
+  "15:00-16:00",
+  "16:00-17:00"
 ];
-
-const mockSlots = ["9:00-10:00", "10:00-11:00", "", "", "", "", "", ""];
-const currentYearMonthLabel = "2026/10";
 
 const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
@@ -34,14 +42,22 @@ const newReservationList = document.getElementById("newReservationList");
 const subjectDropdownToggle = document.getElementById("subjectDropdownToggle");
 const dropdownChevron = document.getElementById("dropdownChevron");
 const pageTopLeft = document.getElementById("pageTopLeft");
+
 const studentReservationsBody = document.getElementById("studentReservationsBody");
 const organizerReservationsBody = document.getElementById("organizerReservationsBody");
 const pendingApplicationsList = document.getElementById("pendingApplicationsList");
 const tutorList = document.getElementById("tutorList");
 const successSummary = document.getElementById("successSummary");
+
 const brandHomeBtn = document.getElementById("brandHomeBtn");
 const successCancelBtn = document.getElementById("successCancelBtn");
 const successModifyBtn = document.getElementById("successModifyBtn");
+
+const modifyModal = document.getElementById("modifyModal");
+const modifyLocationInput = document.getElementById("modifyLocationInput");
+const closeModifyModalBtn = document.getElementById("closeModifyModalBtn");
+const saveModifyModalBtn = document.getElementById("saveModifyModalBtn");
+const changePasswordBtn = document.getElementById("changePasswordBtn");
 
 function showMessage(text) {
   if (!globalMessage) return;
@@ -51,7 +67,16 @@ function showMessage(text) {
   showMessage.timer = setTimeout(() => {
     globalMessage.classList.add("hidden");
     globalMessage.textContent = "";
-  }, 4000);
+  }, 3500);
+}
+
+function normalizeCourse(course) {
+  return (course || "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
+function capitalizeRole(role) {
+  if (!role) return "";
+  return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
 function saveUser(user) {
@@ -61,11 +86,22 @@ function saveUser(user) {
   renderApp();
 }
 
+function persistCurrentView(viewId) {
+  localStorage.setItem("unislotCurrentView", viewId);
+}
+
 function logout() {
   localStorage.removeItem("unislotUser");
   localStorage.removeItem("unislotMode");
+  localStorage.removeItem("unislotCurrentView");
+
   state.user = null;
   state.selectedSubject = null;
+  state.availableSessions = [];
+  state.availableTutors = [];
+  state.lastReservation = null;
+  state.modifySessionId = null;
+
   renderApp();
   showAuthView("loginView");
 }
@@ -78,13 +114,39 @@ function inferModeAndView() {
     state.currentView = "adminView";
   } else if (state.user.role === "organizer") {
     state.mode = "organizer";
-    state.currentView = "organizerHomeView";
+    if (
+      ![
+        "organizerHomeView",
+        "accountView",
+        "examReviewOrganizerView",
+        "officeHourOrganizerView",
+        "successView"
+      ].includes(state.currentView)
+    ) {
+      state.currentView = "organizerHomeView";
+    }
   } else {
     state.mode = "student";
-    state.currentView = "studentHomeView";
+    if (
+      ![
+        "studentHomeView",
+        "accountView",
+        "studentOrganizerRequestView",
+        "taRequestView",
+        "requestTutorStep1View",
+        "chooseTutorView",
+        "tutorMessageView",
+        "examReviewStudentView",
+        "officeHourStudentView",
+        "successView"
+      ].includes(state.currentView)
+    ) {
+      state.currentView = "studentHomeView";
+    }
   }
 
   localStorage.setItem("unislotMode", state.mode);
+  persistCurrentView(state.currentView);
 }
 
 function getHomeViewForCurrentUser() {
@@ -108,6 +170,7 @@ function renderApp() {
   if (!isLoggedIn) {
     if (topbarUserName) topbarUserName.textContent = "";
     toggleSubjectDropdown(false);
+    closeModifyModal();
     return;
   }
 
@@ -136,26 +199,23 @@ function showAppView(viewId) {
   });
 
   state.currentView = viewId;
+  persistCurrentView(viewId);
 
-  if (pageTopLeft) {
-    pageTopLeft.classList.toggle("hidden", !shouldShowNewReservations(viewId));
-  }
-
-  if (!shouldShowNewReservations(viewId)) {
-    toggleSubjectDropdown(false);
-  }
+  if (pageTopLeft) pageTopLeft.classList.toggle("hidden", !shouldShowNewReservations(viewId));
+  if (!shouldShowNewReservations(viewId)) toggleSubjectDropdown(false);
 
   if (viewId === "studentHomeView") loadStudentReservations();
   if (viewId === "organizerHomeView") loadOrganizerReservations();
   if (viewId === "adminView") loadPendingApplications();
   if (viewId === "accountView") renderAccountView();
   if (viewId === "chooseTutorView") renderTutorList();
-  if (viewId === "successView" && successSummary) {
-    successSummary.innerHTML = state.latestConfirmation;
-  }
+  if (viewId === "requestTutorStep1View") prepareTutorRequestView();
+  if (viewId === "examReviewStudentView" || viewId === "officeHourStudentView") refreshAvailableSessions();
+  if (viewId === "successView" && successSummary) successSummary.innerHTML = state.latestConfirmation;
 
   renderTopActionBox();
   renderNewReservationList();
+  syncSuccessButtons();
 }
 
 function renderTopActionBox() {
@@ -197,10 +257,7 @@ function toggleSubjectDropdown(forceOpen = null) {
     forceOpen !== null ? forceOpen : newReservationList.classList.contains("hidden");
 
   newReservationList.classList.toggle("hidden", !shouldOpen);
-
-  if (dropdownChevron) {
-    dropdownChevron.textContent = shouldOpen ? "∧" : "∨";
-  }
+  if (dropdownChevron) dropdownChevron.textContent = shouldOpen ? "∧" : "∨";
 }
 
 function renderNewReservationList() {
@@ -226,12 +283,9 @@ function renderNewReservationList() {
     const btn = document.createElement("button");
     btn.className = "subject-option";
 
-    if (state.selectedSubject === item.label) {
-      btn.classList.add("selected");
-    }
+    if (state.selectedSubject === item.label) btn.classList.add("selected");
 
     btn.innerHTML = `<span>${item.label}</span>`;
-
     btn.addEventListener("click", () => {
       state.selectedSubject = item.label;
       renderNewReservationList();
@@ -256,9 +310,7 @@ function formatTimeRange(start, end) {
   const s = new Date(start);
   const e = new Date(end);
 
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) {
-    return "11:00-12:00";
-  }
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return "11:00-12:00";
 
   const sf = `${String(s.getHours()).padStart(2, "0")}:${String(s.getMinutes()).padStart(2, "0")}`;
   const ef = `${String(e.getHours()).padStart(2, "0")}:${String(e.getMinutes()).padStart(2, "0")}`;
@@ -266,9 +318,41 @@ function formatTimeRange(start, end) {
   return `${sf}-${ef}`;
 }
 
-function mapSubject(title) {
+function mapSubject(title, sessionType) {
   if (title === "Midterm review polling") return "Exam review";
-  return title;
+  if (sessionType === "office-hour") return "Library drop-in/office hours";
+  if (title === "Library drop-in/ office hours") return "Library drop-in/office hours";
+  return title || "Exam review";
+}
+
+function userIsCreator(session) {
+  const createdById =
+    typeof session.createdBy === "object" && session.createdBy !== null
+      ? session.createdBy._id || session.createdBy.id
+      : session.createdBy;
+  return String(createdById) === String(state.user?.id);
+}
+
+function userIsAttendee(session) {
+  if (!Array.isArray(session.attendees)) return false;
+  return session.attendees.some((id) => String(id) === String(state.user?.id));
+}
+
+function slotToHours(slot) {
+  const [start, end] = slot.split("-");
+  if (!start || !end) return null;
+  const startHour = start.split(":")[0].padStart(2, "0");
+  const endHour = end.split(":")[0].padStart(2, "0");
+  return { startHour, endHour };
+}
+
+function sameSelectedDay(dateString) {
+  const date = new Date(dateString);
+  return date.getDate() === state.selectedDate;
+}
+
+function sessionMatchesSlot(session, slot) {
+  return formatTimeRange(session.startTime, session.endTime) === slot;
 }
 
 async function apiFetch(path, options = {}) {
@@ -283,20 +367,20 @@ async function apiFetch(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || data.details || "Request failed");
+    throw new Error(data.error || data.details || data.message || "Request failed");
   }
 
   return data;
 }
 
-function buildReservationRow(session) {
+function buildReservationRow(session, homeMode = "student") {
   const tr = document.createElement("tr");
-  const subject = mapSubject(session.title || "Exam review");
-  const course = session.course || "Comp303";
-  const host = session.createdBy?.name || state.user?.name || "John Doe";
+  const subject = mapSubject(session.title, session.sessionType);
+  const course = session.course || DEFAULT_COURSE;
+  const host = session.createdBy?.name || state.user?.name || "Unknown";
   const date = formatDateOnly(session.startTime);
   const time = formatTimeRange(session.startTime, session.endTime);
-  const location = session.location || "ZoomLink";
+  const location = session.location || "TBD";
 
   tr.innerHTML = `
     <td>${subject}</td>
@@ -305,21 +389,71 @@ function buildReservationRow(session) {
     <td>${date}</td>
     <td>${time}</td>
     <td>${location}</td>
-    <td><button class="table-action-btn">Cancel/Modify</button></td>
+    <td></td>
   `;
 
-  const actionBtn = tr.querySelector(".table-action-btn");
-  if (actionBtn) actionBtn.addEventListener("click", () => {});
+  const actionCell = tr.lastElementChild;
+
+  if (userIsCreator(session) && (state.user.role === "organizer" || state.user.role === "admin")) {
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "table-action-btn clickable-text";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", async () => {
+      try {
+        await apiFetch(`/sessions/${session._id}`, { method: "DELETE" });
+        showMessage("Reservation cancelled.");
+        if (homeMode === "organizer") {
+          loadOrganizerReservations();
+        } else {
+          loadStudentReservations();
+        }
+      } catch (error) {
+        showMessage(error.message);
+      }
+    });
+
+    const divider = document.createTextNode(" / ");
+
+    const modifyBtn = document.createElement("button");
+    modifyBtn.className = "table-action-btn clickable-text";
+    modifyBtn.textContent = "Modify";
+    modifyBtn.addEventListener("click", () => openModifyModal(session));
+
+    actionCell.appendChild(cancelBtn);
+    actionCell.appendChild(divider);
+    actionCell.appendChild(modifyBtn);
+  } else if (userIsAttendee(session)) {
+    const leaveBtn = document.createElement("button");
+    leaveBtn.className = "table-action-btn clickable-text";
+    leaveBtn.textContent = "Cancel";
+    leaveBtn.addEventListener("click", async () => {
+      try {
+        await apiFetch(`/sessions/${session._id}/leave`, {
+          method: "PUT",
+          body: JSON.stringify({ userId: state.user.id })
+        });
+        showMessage("Reservation cancelled.");
+        loadStudentReservations();
+      } catch (error) {
+        showMessage(error.message);
+      }
+    });
+
+    actionCell.appendChild(leaveBtn);
+  } else {
+    actionCell.textContent = "-";
+  }
 
   return tr;
 }
 
 async function loadStudentReservations() {
-  if (!studentReservationsBody) return;
+  if (!studentReservationsBody || !state.user) return;
   studentReservationsBody.innerHTML = "";
 
   try {
-    const sessions = await apiFetch("/sessions");
+    const data = await apiFetch(`/sessions/user/${state.user.id}`);
+    const sessions = data.sessions || [];
 
     if (!sessions.length) {
       const tr = document.createElement("tr");
@@ -329,7 +463,7 @@ async function loadStudentReservations() {
     }
 
     sessions.forEach((session) => {
-      studentReservationsBody.appendChild(buildReservationRow(session));
+      studentReservationsBody.appendChild(buildReservationRow(session, "student"));
     });
   } catch (error) {
     const tr = document.createElement("tr");
@@ -339,7 +473,7 @@ async function loadStudentReservations() {
 }
 
 async function loadOrganizerReservations() {
-  if (!organizerReservationsBody) return;
+  if (!organizerReservationsBody || !state.user) return;
   organizerReservationsBody.innerHTML = "";
 
   try {
@@ -354,7 +488,7 @@ async function loadOrganizerReservations() {
     }
 
     sessions.forEach((session) => {
-      organizerReservationsBody.appendChild(buildReservationRow(session));
+      organizerReservationsBody.appendChild(buildReservationRow(session, "organizer"));
     });
   } catch (error) {
     const tr = document.createElement("tr");
@@ -369,7 +503,7 @@ function renderAccountView() {
   const accountEmail = document.getElementById("accountEmail");
 
   if (accountName) accountName.textContent = state.user.name;
-  if (accountRole) accountRole.textContent = state.user.role;
+  if (accountRole) accountRole.textContent = capitalizeRole(state.user.role);
   if (accountEmail) accountEmail.textContent = state.user.email;
 }
 
@@ -378,38 +512,62 @@ async function loadPendingApplications() {
   pendingApplicationsList.innerHTML = "";
 
   try {
-    const data = await apiFetch("/users/applications/pending");
-    const users = data.users || [];
+    const pendingUsers = await apiFetch("/users/applications/pending");
 
-    if (!users.length) {
+    const entries = [];
+    pendingUsers.forEach((user) => {
+      (user.courseRoles || []).forEach((role) => {
+        if (role.status === "pending") {
+          entries.push({
+            userId: user._id,
+            name: user.name,
+            course: role.course,
+            gpa: role.gpa
+          });
+        }
+      });
+    });
+
+    if (!entries.length) {
       pendingApplicationsList.innerHTML = "<div>No pending applications.</div>";
       return;
     }
 
-    users.forEach((user) => {
+    entries.forEach((entry) => {
       const row = document.createElement("div");
       row.className = "admin-app-row";
       row.innerHTML = `
-        <div>${user.name}</div>
-        <div>${user.gpa ?? "4.0"}</div>
+        <div>${entry.name} (${entry.course})</div>
+        <div>${entry.gpa ?? "-"}</div>
         <div><button class="plain-link clickable-text">Approve</button></div>
         <div><button class="plain-link clickable-text">Decline</button></div>
       `;
 
       const [approveBtn, declineBtn] = row.querySelectorAll("button");
 
-      if (approveBtn) {
-        approveBtn.addEventListener("click", async () => {
-          try {
-            await apiFetch(`/users/${user._id}/approve`, { method: "PUT" });
-            loadPendingApplications();
-          } catch (error) {}
-        });
-      }
+      approveBtn.addEventListener("click", async () => {
+        try {
+          await apiFetch(`/users/${entry.userId}/approve/${encodeURIComponent(entry.course)}`, {
+            method: "PUT"
+          });
+          showMessage(`Approved ${entry.name} for ${entry.course}.`);
+          loadPendingApplications();
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
 
-      if (declineBtn) {
-        declineBtn.addEventListener("click", () => {});
-      }
+      declineBtn.addEventListener("click", async () => {
+        try {
+          await apiFetch(`/users/${entry.userId}/decline/${encodeURIComponent(entry.course)}`, {
+            method: "PUT"
+          });
+          showMessage(`Declined ${entry.name} for ${entry.course}.`);
+          loadPendingApplications();
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
 
       pendingApplicationsList.appendChild(row);
     });
@@ -496,10 +654,16 @@ function renderCalendar(containerId) {
           "examReviewOrganizerCalendar",
           "officeHourOrganizerCalendar"
         ].forEach((id) => {
-          if (document.getElementById(id)) {
-            renderCalendar(id);
-          }
+          if (document.getElementById(id)) renderCalendar(id);
         });
+
+        if (
+          ["requestTutorStep1View", "examReviewStudentView", "officeHourStudentView"].includes(
+            state.currentView
+          )
+        ) {
+          refreshAvailableSessions();
+        }
       });
     }
 
@@ -510,13 +674,47 @@ function renderCalendar(containerId) {
   container.appendChild(days);
 }
 
+function availableSlotsForType(sessionType) {
+  return state.availableSessions
+    .filter((session) => session.sessionType === sessionType)
+    .filter((session) => sameSelectedDay(session.startTime))
+    .filter((session) => !userIsCreator(session))
+    .filter((session) => !userIsAttendee(session))
+    .map((session) => formatTimeRange(session.startTime, session.endTime));
+}
+
+function buildSlotChoices(containerId) {
+  if (containerId === "examReviewStudentSlots") {
+    const available = availableSlotsForType("review");
+    return [...new Set([...available, ...baseSlots])];
+  }
+
+  if (containerId === "officeHourStudentSlots") {
+    const available = availableSlotsForType("office-hour");
+    return [...new Set([...available, ...baseSlots])];
+  }
+
+  return [...baseSlots];
+}
+
+async function refreshAvailableSessions() {
+  try {
+    state.availableSessions = await apiFetch("/sessions");
+  } catch (error) {
+    state.availableSessions = [];
+  }
+  rerenderSlots();
+}
+
 function renderSlotGrid(containerId, selectedValue, multi = false) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
   container.innerHTML = "";
 
-  mockSlots.forEach((slot) => {
+  const slots = buildSlotChoices(containerId);
+
+  slots.forEach((slot) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "slot-btn";
@@ -526,9 +724,7 @@ function renderSlotGrid(containerId, selectedValue, multi = false) {
       ? slot && selectedValue.includes(slot)
       : slot && selectedValue === slot;
 
-    if (isSelected) {
-      btn.classList.add("selected");
-    }
+    if (isSelected) btn.classList.add("selected");
 
     btn.addEventListener("click", () => {
       if (!slot) return;
@@ -540,18 +736,11 @@ function renderSlotGrid(containerId, selectedValue, multi = false) {
         if (index >= 0) {
           list.splice(index, 1);
         } else {
-          if (containerId === "requestTutorSlots" && list.length >= 3) {
-            return;
-          }
           list.push(slot);
         }
       } else {
-        if (containerId === "examReviewStudentSlots") {
-          state.selectedExamSlot = slot;
-        }
-        if (containerId === "officeHourStudentSlots") {
-          state.selectedOfficeHourSlot = slot;
-        }
+        if (containerId === "examReviewStudentSlots") state.selectedExamSlot = slot;
+        if (containerId === "officeHourStudentSlots") state.selectedOfficeHourSlot = slot;
       }
 
       rerenderSlots();
@@ -569,22 +758,43 @@ function rerenderSlots() {
   renderSlotGrid("officeHourOrganizerSlots", state.selectedOrganizerOfficeSlots, true);
 }
 
+async function prepareTutorRequestView() {
+  state.availableTutors = [];
+  state.selectedTutorId = null;
+  renderTutorList();
+
+  try {
+    const tutors = await apiFetch(`/users/tutors/${encodeURIComponent(DEFAULT_COURSE)}`);
+    state.availableTutors = tutors || [];
+  } catch (error) {
+    state.availableTutors = [];
+  }
+
+  renderTutorList();
+}
+
 function renderTutorList() {
   if (!tutorList) return;
   tutorList.innerHTML = "";
 
-  mockTutors.forEach((tutor) => {
+  if (!state.availableTutors.length) {
+    tutorList.innerHTML = `<div>No tutors found for ${DEFAULT_COURSE}.</div>`;
+    return;
+  }
+
+  state.availableTutors.forEach((tutor) => {
+    const tutorId = tutor._id || tutor.id;
     const card = document.createElement("div");
-    card.className = `tutor-card ${state.selectedTutorId === tutor.id ? "selected" : ""}`;
+    card.className = `tutor-card ${state.selectedTutorId === tutorId ? "selected" : ""}`;
     card.innerHTML = `
-      <div class="tutor-photo">Photo here(default if not no photo)</div>
+      <div class="tutor-photo">Tutor</div>
       <div class="tutor-meta">| name: ${tutor.name}</div>
-      <div class="tutor-meta">| responsible class: ${tutor.course}</div>
+      <div class="tutor-meta">| responsible class: ${DEFAULT_COURSE}</div>
       <div class="tutor-meta">| email: ${tutor.email}</div>
     `;
 
     card.addEventListener("click", () => {
-      state.selectedTutorId = tutor.id;
+      state.selectedTutorId = tutorId;
       renderTutorList();
     });
 
@@ -600,22 +810,162 @@ function buildSuccessHtml(title, extraLines = []) {
   ].join("");
 }
 
-async function createStudentReservation({ title, course, location, slot }) {
-  const date = String(state.selectedDate).padStart(2, "0");
-  const startHour = slot.startsWith("9:00") ? "09" : "10";
-  const endHour = slot.startsWith("9:00") ? "10" : "11";
+function syncSuccessButtons() {
+  if (!successCancelBtn || !successModifyBtn) return;
 
-  await apiFetch("/sessions", {
+  const hasReservation = !!state.lastReservation;
+  successCancelBtn.disabled = !hasReservation;
+  successModifyBtn.disabled = !hasReservation || state.lastReservation?.mode !== "created";
+}
+
+async function joinMatchingSession(sessionType, slot) {
+  const match = state.availableSessions.find((session) => {
+    return session.sessionType === sessionType &&
+      sameSelectedDay(session.startTime) &&
+      sessionMatchesSlot(session, slot) &&
+      !userIsAttendee(session);
+  });
+
+  if (!match) {
+    throw new Error(
+      "No matching reservation for that timeslot. This usually means an organizer has not created a session for that date/time yet."
+    );
+  }
+
+  await apiFetch(`/sessions/${match._id}/join`, {
+    method: "PUT",
+    body: JSON.stringify({ userId: state.user.id })
+  });
+
+  return match;
+}
+
+async function createOrganizerSession({ title, sessionType, slot, location, course }) {
+  const hours = slotToHours(slot);
+  if (!hours) throw new Error("Invalid time slot.");
+
+  const date = String(state.selectedDate).padStart(2, "0");
+  const startTime = new Date(`2026-10-${date}T${hours.startHour}:00:00`).toISOString();
+  const endTime = new Date(`2026-10-${date}T${hours.endHour}:00:00`).toISOString();
+
+  const normalizedCourse = normalizeCourse(course || DEFAULT_COURSE);
+
+  const data = await apiFetch("/sessions", {
     method: "POST",
     body: JSON.stringify({
       title,
-      course,
-      startTime: new Date(`2026-10-${date}T${startHour}:00:00`).toISOString(),
-      endTime: new Date(`2026-10-${date}T${endHour}:00:00`).toISOString(),
+      course: normalizedCourse,
+      sessionType,
+      startTime,
+      endTime,
       location,
       createdBy: state.user.id
     })
   });
+
+  return data.session;
+}
+
+function resetStudentSelections() {
+  state.selectedTutorSlots = [];
+  state.selectedTutorId = null;
+  state.selectedExamSlot = null;
+  state.selectedOfficeHourSlot = null;
+  state.availableTutors = [];
+  const tutorMessage = document.getElementById("tutorMessage");
+  if (tutorMessage) tutorMessage.value = "";
+  rerenderSlots();
+}
+
+function resetOrganizerSelections() {
+  state.selectedOrganizerExamSlots = [];
+  state.selectedOrganizerOfficeSlots = [];
+  const examHost = document.getElementById("examOrganizerHostRoom");
+  const examZoom = document.getElementById("examOrganizerZoomLink");
+  const officeHost = document.getElementById("officeOrganizerHostRoom");
+  const officeZoom = document.getElementById("officeOrganizerZoomLink");
+
+  if (examHost) examHost.value = "";
+  if (examZoom) examZoom.value = "";
+  if (officeHost) officeHost.value = "";
+  if (officeZoom) officeZoom.value = "";
+  rerenderSlots();
+}
+
+async function cancelLastReservation() {
+  if (!state.lastReservation || !state.user) return;
+
+  try {
+    if (state.lastReservation.mode === "joined") {
+      await apiFetch(`/sessions/${state.lastReservation.sessionId}/leave`, {
+        method: "PUT",
+        body: JSON.stringify({ userId: state.user.id })
+      });
+      showMessage("Reservation cancelled.");
+      state.lastReservation = null;
+      syncSuccessButtons();
+      showAppView("studentHomeView");
+      return;
+    }
+
+    if (state.lastReservation.mode === "created") {
+      await apiFetch(`/sessions/${state.lastReservation.sessionId}`, { method: "DELETE" });
+      showMessage("Reservation cancelled.");
+      state.lastReservation = null;
+      syncSuccessButtons();
+      showAppView(getHomeViewForCurrentUser());
+    }
+  } catch (error) {
+    showMessage(error.message);
+  }
+}
+
+function openModifyModal(session) {
+  if (!modifyModal || !modifyLocationInput) return;
+  state.modifySessionId = session._id;
+  modifyLocationInput.value = session.location || "";
+  modifyModal.classList.remove("hidden");
+}
+
+function openModifyLastReservation() {
+  if (!state.lastReservation || state.lastReservation.mode !== "created") return;
+  if (!modifyModal || !modifyLocationInput) return;
+  state.modifySessionId = state.lastReservation.sessionId;
+  modifyLocationInput.value = state.lastReservation.location || "";
+  modifyModal.classList.remove("hidden");
+}
+
+function closeModifyModal() {
+  if (!modifyModal) return;
+  modifyModal.classList.add("hidden");
+  state.modifySessionId = null;
+}
+
+async function saveModifyModal() {
+  if (!state.modifySessionId || !modifyLocationInput) return;
+
+  try {
+    const newLocation = modifyLocationInput.value.trim();
+    await apiFetch(`/sessions/${state.modifySessionId}`, {
+      method: "PUT",
+      body: JSON.stringify({ location: newLocation })
+    });
+
+    if (state.lastReservation && state.lastReservation.sessionId === state.modifySessionId) {
+      state.lastReservation.location = newLocation;
+    }
+
+    showMessage("Reservation modified.");
+    closeModifyModal();
+
+    if (state.mode === "organizer") {
+      loadOrganizerReservations();
+    } else {
+      loadStudentReservations();
+    }
+  } catch (error) {
+    showMessage(error.message);
+  }
 }
 
 document.querySelectorAll("[data-auth-target]").forEach((btn) => {
@@ -668,7 +1018,10 @@ if (loginForm) {
       });
 
       saveUser(data.user);
-    } catch (error) {}
+      showMessage("Login successful.");
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
@@ -687,8 +1040,11 @@ if (registerForm) {
         })
       });
 
+      showMessage("Account created.");
       showAuthView("loginView");
-    } catch (error) {}
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
@@ -706,31 +1062,67 @@ if (organizerRequestForm) {
     event.preventDefault();
 
     try {
+      const course = normalizeCourse(
+        document.getElementById("organizerRequestClass").value || DEFAULT_COURSE
+      );
+
       const result = await apiFetch(`/users/${state.user.id}/apply`, {
         method: "PUT",
         body: JSON.stringify({
+          course,
           gpa: document.getElementById("organizerRequestGpa").value
         })
       });
 
-      state.user.applicationStatus = result.status;
-      localStorage.setItem("unislotUser", JSON.stringify(state.user));
+      showMessage(result.message || "Application submitted.");
       showAppView("studentHomeView");
-    } catch (error) {}
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 const taRequestForm = document.getElementById("taRequestForm");
 if (taRequestForm) {
-  taRequestForm.addEventListener("submit", (event) => {
+  taRequestForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+
+    try {
+      const course = normalizeCourse(
+        document.getElementById("taRequestClass").value || DEFAULT_COURSE
+      );
+
+      const result = await apiFetch(`/users/${state.user.id}/apply`, {
+        method: "PUT",
+        body: JSON.stringify({
+          course,
+          taCode: document.getElementById("taRequestCode").value.trim()
+        })
+      });
+
+      if (result.message && result.message.includes("Organizer")) {
+        state.user.role = "organizer";
+        localStorage.setItem("unislotUser", JSON.stringify(state.user));
+        inferModeAndView();
+      }
+
+      showMessage(result.message || "TA request submitted.");
+      showAppView(getHomeViewForCurrentUser());
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 const toTutorSelectionBtn = document.getElementById("toTutorSelectionBtn");
 if (toTutorSelectionBtn) {
-  toTutorSelectionBtn.addEventListener("click", () => {
-    if (!state.selectedTutorSlots.length) return;
+  toTutorSelectionBtn.addEventListener("click", async () => {
+    if (!state.selectedTutorSlots.length) {
+      showMessage("Select at least one time slot.");
+      return;
+    }
+
+    await prepareTutorRequestView();
     showAppView("chooseTutorView");
   });
 }
@@ -738,7 +1130,11 @@ if (toTutorSelectionBtn) {
 const toTutorMessageBtn = document.getElementById("toTutorMessageBtn");
 if (toTutorMessageBtn) {
   toTutorMessageBtn.addEventListener("click", () => {
-    if (!state.selectedTutorId) return;
+    if (!state.selectedTutorId) {
+      showMessage("Choose a tutor first.");
+      return;
+    }
+
     showAppView("tutorMessageView");
   });
 }
@@ -748,126 +1144,218 @@ if (submitTutorRequestBtn) {
   submitTutorRequestBtn.addEventListener("click", async () => {
     const message = document.getElementById("tutorMessage").value.trim();
 
-    if (!state.selectedTutorSlots.length) return;
+    if (!state.selectedTutorSlots.length || !state.selectedTutorId) {
+      showMessage("Choose a tutor and at least one time slot.");
+      return;
+    }
 
     try {
-      await createStudentReservation({
-        title: "Request a tutor",
-        course: "COMP303",
-        location: "ZoomLink",
-        slot: state.selectedTutorSlots[0]
+      await apiFetch("/users/request-tutor", {
+        method: "POST",
+        body: JSON.stringify({
+          studentId: state.user.id,
+          tutorId: state.selectedTutorId,
+          course: DEFAULT_COURSE,
+          message
+        })
       });
-    } catch (error) {}
 
-    state.latestConfirmation = buildSuccessHtml("Request a tutor", [
-      `<div>Selected time slot(s): ${state.selectedTutorSlots.join(". ")}.</div>`,
-      `<div>Message: ${message}</div>`
-    ]);
+      state.latestConfirmation = buildSuccessHtml("Request a tutor", [
+        `<div>Requested course: ${DEFAULT_COURSE}</div>`,
+        `<div>Selected time slot(s): ${state.selectedTutorSlots.join(". ")}</div>`,
+        `<div>Message: ${message || "No message provided."}</div>`
+      ]);
 
-    showAppView("successView");
+      state.lastReservation = null;
+      syncSuccessButtons();
+      showAppView("successView");
+      resetStudentSelections();
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 const submitExamReviewStudentBtn = document.getElementById("submitExamReviewStudentBtn");
 if (submitExamReviewStudentBtn) {
   submitExamReviewStudentBtn.addEventListener("click", async () => {
-    if (!state.selectedExamSlot) return;
+    if (!state.selectedExamSlot) {
+      showMessage("Select a time slot.");
+      return;
+    }
 
     try {
-      await createStudentReservation({
-        title: "Exam review",
-        course: "COMP303",
-        location: "ZoomLink",
-        slot: state.selectedExamSlot
-      });
-    } catch (error) {}
+      const joinedSession = await joinMatchingSession("review", state.selectedExamSlot);
 
-    state.latestConfirmation = buildSuccessHtml("Exam review", [
-      `<div>Selected time slot: ${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${state.selectedExamSlot}.</div>`
-    ]);
+      state.lastReservation = {
+        mode: "joined",
+        sessionId: joinedSession._id,
+        location: joinedSession.location
+      };
 
-    showAppView("successView");
+      state.latestConfirmation = buildSuccessHtml("Exam review", [
+        `<div>Selected time slot: ${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${state.selectedExamSlot}</div>`,
+        `<div>Location/Link: ${joinedSession.location || "TBD"}</div>`
+      ]);
+
+      syncSuccessButtons();
+      showAppView("successView");
+      resetStudentSelections();
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 const submitOfficeHourStudentBtn = document.getElementById("submitOfficeHourStudentBtn");
 if (submitOfficeHourStudentBtn) {
   submitOfficeHourStudentBtn.addEventListener("click", async () => {
-    if (!state.selectedOfficeHourSlot) return;
+    if (!state.selectedOfficeHourSlot) {
+      showMessage("Select a time slot.");
+      return;
+    }
 
     try {
-      await createStudentReservation({
-        title: "Library drop-in/ office hours",
-        course: "COMP303",
-        location: "RedPath361",
-        slot: state.selectedOfficeHourSlot
-      });
-    } catch (error) {}
+      const joinedSession = await joinMatchingSession("office-hour", state.selectedOfficeHourSlot);
 
-    state.latestConfirmation = buildSuccessHtml("Library drop-in/ office hours", [
-      `<div>Selected time slot(s):</div><div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${state.selectedOfficeHourSlot} at RedPath361.</div>`
-    ]);
+      state.lastReservation = {
+        mode: "joined",
+        sessionId: joinedSession._id,
+        location: joinedSession.location
+      };
 
-    showAppView("successView");
+      state.latestConfirmation = buildSuccessHtml("Library drop-in/ office hours", [
+        `<div>Selected time slot(s):</div>`,
+        `<div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${state.selectedOfficeHourSlot} at ${joinedSession.location || "TBD"}.</div>`
+      ]);
+
+      syncSuccessButtons();
+      showAppView("successView");
+      resetStudentSelections();
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 const submitExamReviewOrganizerBtn = document.getElementById("submitExamReviewOrganizerBtn");
 if (submitExamReviewOrganizerBtn) {
   submitExamReviewOrganizerBtn.addEventListener("click", async () => {
+    const slot = state.selectedOrganizerExamSlots[0];
+    if (!slot) {
+      showMessage("Select at least one time slot.");
+      return;
+    }
+
+    const hostRoom = document.getElementById("examOrganizerHostRoom").value.trim();
+    const zoomLink = document.getElementById("examOrganizerZoomLink").value.trim();
+    const location = hostRoom || zoomLink || "TBD";
+
     try {
-      await apiFetch("/sessions", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "Exam review",
-          course: "COMP303",
-          startTime: new Date("2026-10-09T11:00:00").toISOString(),
-          endTime: new Date("2026-10-09T12:00:00").toISOString(),
-          location: "ZoomLink",
-          createdBy: state.user.id
-        })
+      const created = await createOrganizerSession({
+        title: "Exam review",
+        sessionType: "review",
+        slot,
+        location,
+        course: DEFAULT_COURSE
       });
 
+      state.lastReservation = {
+        mode: "created",
+        sessionId: created._id,
+        location: created.location
+      };
+
       state.latestConfirmation = buildSuccessHtml("Exam review", [
-        `<div>Selected time slot(s):</div><div>2026/10/09: 11:00 -12:00.</div>`
+        `<div>Selected time slot(s):</div>`,
+        `<div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${slot}</div>`,
+        `<div>Location/Link: ${created.location}</div>`
       ]);
 
+      syncSuccessButtons();
       showAppView("successView");
-    } catch (error) {}
+      resetOrganizerSelections();
+      refreshAvailableSessions();
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 const submitOfficeHourOrganizerBtn = document.getElementById("submitOfficeHourOrganizerBtn");
 if (submitOfficeHourOrganizerBtn) {
   submitOfficeHourOrganizerBtn.addEventListener("click", async () => {
+    const slot = state.selectedOrganizerOfficeSlots[0];
+    if (!slot) {
+      showMessage("Select at least one time slot.");
+      return;
+    }
+
+    const hostRoom = document.getElementById("officeOrganizerHostRoom").value.trim();
+    const zoomLink = document.getElementById("officeOrganizerZoomLink").value.trim();
+    const location = hostRoom || zoomLink || "TBD";
+
     try {
-      await apiFetch("/sessions", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "Library drop-in/ office hours",
-          course: "COMP421",
-          startTime: new Date("2026-10-09T11:00:00").toISOString(),
-          endTime: new Date("2026-10-09T12:00:00").toISOString(),
-          location: "RedPath361",
-          createdBy: state.user.id
-        })
+      const created = await createOrganizerSession({
+        title: "Library drop-in/ office hours",
+        sessionType: "office-hour",
+        slot,
+        location,
+        course: DEFAULT_COURSE
       });
 
+      state.lastReservation = {
+        mode: "created",
+        sessionId: created._id,
+        location: created.location
+      };
+
       state.latestConfirmation = buildSuccessHtml("Library drop-in/ office hours", [
-        `<div>Selected time slot(s):</div><div>2026/10/09: 11:00 -12:00 at RedPath361.</div>`
+        `<div>Selected time slot(s):</div>`,
+        `<div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${slot}</div>`,
+        `<div>Location/Link: ${created.location}</div>`
       ]);
 
+      syncSuccessButtons();
       showAppView("successView");
-    } catch (error) {}
+      resetOrganizerSelections();
+      refreshAvailableSessions();
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
 if (successCancelBtn) {
-  successCancelBtn.addEventListener("click", () => {});
+  successCancelBtn.addEventListener("click", async () => {
+    await cancelLastReservation();
+  });
 }
 
 if (successModifyBtn) {
-  successModifyBtn.addEventListener("click", () => {});
+  successModifyBtn.addEventListener("click", () => {
+    openModifyLastReservation();
+  });
+}
+
+if (closeModifyModalBtn) {
+  closeModifyModalBtn.addEventListener("click", closeModifyModal);
+}
+
+if (saveModifyModalBtn) {
+  saveModifyModalBtn.addEventListener("click", saveModifyModal);
+}
+
+if (modifyModal) {
+  modifyModal.addEventListener("click", (event) => {
+    if (event.target === modifyModal) closeModifyModal();
+  });
+}
+
+if (changePasswordBtn) {
+  changePasswordBtn.addEventListener("click", () => {
+    showMessage("Change password is not available yet because the backend does not have a password-change route.");
+  });
 }
 
 [
@@ -877,16 +1365,16 @@ if (successModifyBtn) {
   "examReviewOrganizerCalendar",
   "officeHourOrganizerCalendar"
 ].forEach((id) => {
-  if (document.getElementById(id)) {
-    renderCalendar(id);
-  }
+  if (document.getElementById(id)) renderCalendar(id);
 });
 
 rerenderSlots();
+syncSuccessButtons();
 
 if (state.user) {
   inferModeAndView();
   renderApp();
+  refreshAvailableSessions();
 } else {
   renderApp();
   showAuthView("loginView");
