@@ -49,6 +49,28 @@ router.post('/', async (req, res) => {
       }
     }
 
+
+    // Check if the exact time slot is already taken by this TA
+    const existingSession = await StudySession.findOne({
+      startTime: startTime,
+      $or: [
+        { createdBy: user._id }, // TA is already hosting something
+        { 
+          // Scenario B: The room is taken (but ignore if the requested room is TBD or empty)
+          location: { 
+            $eq: location,          // The location matches the one being requested
+            $nin: ["TBD", "", "tbd"] // And the requested location is not TBD or blank
+          }
+        }
+      ]
+    });
+
+    if (existingSession) {
+      return res.status(400).json({ 
+        error: "Double booking detected! Either you are already busy at this time, or the room is taken." 
+      });
+    }
+
     const newSession = new StudySession({
       title,
       course,

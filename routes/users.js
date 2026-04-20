@@ -33,6 +33,33 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Route: PUT /api/users/reset-password
+// Reset password
+router.put('/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "Email and new password are required." });
+    }
+
+    const user = await User.findOne({ email: email });
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    user.password = newPassword;
+    
+    await user.save();
+
+    res.status(200).json({ message: "Password successfully updated! You can now log in." });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to reset password." });
+  }
+});
+
 // Route: PUT /api/users/:id/apply
 // A student submit an application with a self-reported GPA for admin review
 router.put('/:id/apply', async (req, res) => {
