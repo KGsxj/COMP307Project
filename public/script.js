@@ -1,19 +1,13 @@
 const API_BASE = "/api";
 const DEFAULT_COURSE = "COMP307";
-const currentYearMonthLabel = "2026/10";
 
 const state = {
   user: JSON.parse(localStorage.getItem("unislotUser") || "null"),
   mode: localStorage.getItem("unislotMode") || "student",
   currentView: localStorage.getItem("unislotCurrentView") || "studentHomeView",
   selectedSubject: null,
-  selectedDate: 2,
   selectedTutorId: null,
   selectedTutorSlots: [],
-  selectedExamSlot: null,
-  selectedOfficeHourSlot: null,
-  selectedOrganizerExamSlots: [],
-  selectedOrganizerOfficeSlots: [],
   latestConfirmation: "",
   availableSessions: [],
   availableTutors: [],
@@ -21,7 +15,7 @@ const state = {
   modifySessionId: null
 };
 
-const baseSlots = [
+const tutorSlots = [
   "9:00-10:00",
   "10:00-11:00",
   "11:00-12:00",
@@ -48,6 +42,10 @@ const organizerReservationsBody = document.getElementById("organizerReservations
 const pendingApplicationsList = document.getElementById("pendingApplicationsList");
 const tutorList = document.getElementById("tutorList");
 const successSummary = document.getElementById("successSummary");
+const requestTutorSlotsEl = document.getElementById("requestTutorSlots");
+
+const examReviewStudentListBody = document.getElementById("examReviewStudentListBody");
+const officeHourStudentListBody = document.getElementById("officeHourStudentListBody");
 
 const brandHomeBtn = document.getElementById("brandHomeBtn");
 const successCancelBtn = document.getElementById("successCancelBtn");
@@ -59,6 +57,9 @@ const closeModifyModalBtn = document.getElementById("closeModifyModalBtn");
 const saveModifyModalBtn = document.getElementById("saveModifyModalBtn");
 const changePasswordBtn = document.getElementById("changePasswordBtn");
 
+const examReviewOrganizerForm = document.getElementById("examReviewOrganizerForm");
+const officeHourOrganizerForm = document.getElementById("officeHourOrganizerForm");
+
 function showMessage(text) {
   if (!globalMessage) return;
   globalMessage.textContent = text;
@@ -67,7 +68,7 @@ function showMessage(text) {
   showMessage.timer = setTimeout(() => {
     globalMessage.classList.add("hidden");
     globalMessage.textContent = "";
-  }, 3500);
+  }, 4500);
 }
 
 function normalizeCourse(course) {
@@ -209,8 +210,9 @@ function showAppView(viewId) {
   if (viewId === "adminView") loadPendingApplications();
   if (viewId === "accountView") renderAccountView();
   if (viewId === "chooseTutorView") renderTutorList();
-  if (viewId === "requestTutorStep1View") prepareTutorRequestView();
-  if (viewId === "examReviewStudentView" || viewId === "officeHourStudentView") refreshAvailableSessions();
+  if (viewId === "requestTutorStep1View") renderTutorSlots();
+  if (viewId === "examReviewStudentView") loadAvailableStudentSessions("review");
+  if (viewId === "officeHourStudentView") loadAvailableStudentSessions("office-hour");
   if (viewId === "successView" && successSummary) successSummary.innerHTML = state.latestConfirmation;
 
   renderTopActionBox();
@@ -252,7 +254,6 @@ function addActionButton(label, handler) {
 
 function toggleSubjectDropdown(forceOpen = null) {
   if (!newReservationList) return;
-
   const shouldOpen =
     forceOpen !== null ? forceOpen : newReservationList.classList.contains("hidden");
 
@@ -299,7 +300,7 @@ function renderNewReservationList() {
 
 function formatDateOnly(dateString) {
   const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "08-04-2026";
+  if (Number.isNaN(date.getTime())) return "Invalid date";
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const yyyy = date.getFullYear();
@@ -310,12 +311,20 @@ function formatTimeRange(start, end) {
   const s = new Date(start);
   const e = new Date(end);
 
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return "11:00-12:00";
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return "Invalid time";
 
   const sf = `${String(s.getHours()).padStart(2, "0")}:${String(s.getMinutes()).padStart(2, "0")}`;
   const ef = `${String(e.getHours()).padStart(2, "0")}:${String(e.getMinutes()).padStart(2, "0")}`;
-
   return `${sf}-${ef}`;
+}
+
+function formatDateTimeForSuccess(dateString) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "Invalid date";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function mapSubject(title, sessionType) {
@@ -338,23 +347,6 @@ function userIsAttendee(session) {
   return session.attendees.some((id) => String(id) === String(state.user?.id));
 }
 
-function slotToHours(slot) {
-  const [start, end] = slot.split("-");
-  if (!start || !end) return null;
-  const startHour = start.split(":")[0].padStart(2, "0");
-  const endHour = end.split(":")[0].padStart(2, "0");
-  return { startHour, endHour };
-}
-
-function sameSelectedDay(dateString) {
-  const date = new Date(dateString);
-  return date.getDate() === state.selectedDate;
-}
-
-function sessionMatchesSlot(session, slot) {
-  return formatTimeRange(session.startTime, session.endTime) === slot;
-}
-
 async function apiFetch(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -364,7 +356,14 @@ async function apiFetch(path, options = {}) {
     ...options
   });
 
-  const data = await response.json().catch(() => ({}));
+  const rawText = await response.text();
+  let data = {};
+
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = { error: rawText || "Request failed" };
+  }
 
   if (!response.ok) {
     throw new Error(data.error || data.details || data.message || "Request failed");
@@ -403,9 +402,9 @@ function buildReservationRow(session, homeMode = "student") {
         await apiFetch(`/sessions/${session._id}`, { method: "DELETE" });
         showMessage("Reservation cancelled.");
         if (homeMode === "organizer") {
-          loadOrganizerReservations();
+          await loadOrganizerReservations();
         } else {
-          loadStudentReservations();
+          await loadStudentReservations();
         }
       } catch (error) {
         showMessage(error.message);
@@ -433,7 +432,7 @@ function buildReservationRow(session, homeMode = "student") {
           body: JSON.stringify({ userId: state.user.id })
         });
         showMessage("Reservation cancelled.");
-        loadStudentReservations();
+        await loadStudentReservations();
       } catch (error) {
         showMessage(error.message);
       }
@@ -576,230 +575,121 @@ async function loadPendingApplications() {
   }
 }
 
-function renderCalendar(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+function renderTutorSlots() {
+  if (!requestTutorSlotsEl) return;
+  requestTutorSlotsEl.innerHTML = "";
 
-  container.innerHTML = "";
-
-  const weekdays = document.createElement("div");
-  weekdays.className = "calendar-weekdays";
-  ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].forEach((day) => {
-    const el = document.createElement("div");
-    el.textContent = day;
-    weekdays.appendChild(el);
-  });
-
-  const days = document.createElement("div");
-  days.className = "calendar-days";
-
-  const values = [
-    { value: 1, currentMonth: true },
-    { value: 2, currentMonth: true },
-    { value: 3, currentMonth: true },
-    { value: 4, currentMonth: true },
-    { value: 5, currentMonth: true },
-    { value: 6, currentMonth: true },
-    { value: 7, currentMonth: true },
-    { value: 8, currentMonth: true },
-    { value: 9, currentMonth: true },
-    { value: 10, currentMonth: true },
-    { value: 11, currentMonth: true },
-    { value: 12, currentMonth: true },
-    { value: 13, currentMonth: true },
-    { value: 14, currentMonth: true },
-    { value: 15, currentMonth: true },
-    { value: 16, currentMonth: true },
-    { value: 17, currentMonth: true },
-    { value: 18, currentMonth: true },
-    { value: 19, currentMonth: true },
-    { value: 20, currentMonth: true },
-    { value: 21, currentMonth: true },
-    { value: 22, currentMonth: true },
-    { value: 23, currentMonth: true },
-    { value: 24, currentMonth: true },
-    { value: 25, currentMonth: true },
-    { value: 26, currentMonth: true },
-    { value: 27, currentMonth: true },
-    { value: 28, currentMonth: true },
-    { value: 29, currentMonth: true },
-    { value: 30, currentMonth: true },
-    { value: 1, currentMonth: false },
-    { value: 2, currentMonth: false },
-    { value: 3, currentMonth: false },
-    { value: 4, currentMonth: false }
-  ];
-
-  values.forEach((entry) => {
-    const day = document.createElement("div");
-    day.className = "calendar-day";
-    day.textContent = entry.value;
-
-    if (!entry.currentMonth) {
-      day.classList.add("disabled");
-    }
-
-    if (entry.currentMonth && entry.value === state.selectedDate) {
-      day.classList.add("selected");
-    }
-
-    if (entry.currentMonth) {
-      day.addEventListener("click", () => {
-        state.selectedDate = entry.value;
-
-        [
-          "requestTutorCalendar",
-          "examReviewStudentCalendar",
-          "officeHourStudentCalendar",
-          "examReviewOrganizerCalendar",
-          "officeHourOrganizerCalendar"
-        ].forEach((id) => {
-          if (document.getElementById(id)) renderCalendar(id);
-        });
-
-        if (
-          ["requestTutorStep1View", "examReviewStudentView", "officeHourStudentView"].includes(
-            state.currentView
-          )
-        ) {
-          refreshAvailableSessions();
-        }
-      });
-    }
-
-    days.appendChild(day);
-  });
-
-  container.appendChild(weekdays);
-  container.appendChild(days);
-}
-
-function availableSlotsForType(sessionType) {
-  return state.availableSessions
-    .filter((session) => session.sessionType === sessionType)
-    .filter((session) => sameSelectedDay(session.startTime))
-    .filter((session) => !userIsCreator(session))
-    .filter((session) => !userIsAttendee(session))
-    .map((session) => formatTimeRange(session.startTime, session.endTime));
-}
-
-function buildSlotChoices(containerId) {
-  if (containerId === "examReviewStudentSlots") {
-    const available = availableSlotsForType("review");
-    return [...new Set([...available, ...baseSlots])];
-  }
-
-  if (containerId === "officeHourStudentSlots") {
-    const available = availableSlotsForType("office-hour");
-    return [...new Set([...available, ...baseSlots])];
-  }
-
-  return [...baseSlots];
-}
-
-async function refreshAvailableSessions() {
-  try {
-    state.availableSessions = await apiFetch("/sessions");
-  } catch (error) {
-    state.availableSessions = [];
-  }
-  rerenderSlots();
-}
-
-function renderSlotGrid(containerId, selectedValue, multi = false) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  const slots = buildSlotChoices(containerId);
-
-  slots.forEach((slot) => {
+  tutorSlots.forEach((slot) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "slot-btn";
-    btn.textContent = slot || "";
+    btn.textContent = slot;
 
-    const isSelected = multi
-      ? slot && selectedValue.includes(slot)
-      : slot && selectedValue === slot;
-
-    if (isSelected) btn.classList.add("selected");
+    if (state.selectedTutorSlots.includes(slot)) {
+      btn.classList.add("selected");
+    }
 
     btn.addEventListener("click", () => {
-      if (!slot) return;
+      const index = state.selectedTutorSlots.indexOf(slot);
 
-      if (multi) {
-        const list = selectedValue;
-        const index = list.indexOf(slot);
-
-        if (index >= 0) {
-          list.splice(index, 1);
-        } else {
-          list.push(slot);
-        }
+      if (index >= 0) {
+        state.selectedTutorSlots.splice(index, 1);
       } else {
-        if (containerId === "examReviewStudentSlots") state.selectedExamSlot = slot;
-        if (containerId === "officeHourStudentSlots") state.selectedOfficeHourSlot = slot;
+        if (state.selectedTutorSlots.length >= 3) {
+          showMessage("You can select up to three time slots.");
+          return;
+        }
+        state.selectedTutorSlots.push(slot);
       }
 
-      rerenderSlots();
+      renderTutorSlots();
     });
 
-    container.appendChild(btn);
+    requestTutorSlotsEl.appendChild(btn);
   });
 }
 
-function rerenderSlots() {
-  renderSlotGrid("requestTutorSlots", state.selectedTutorSlots, true);
-  renderSlotGrid("examReviewStudentSlots", state.selectedExamSlot, false);
-  renderSlotGrid("officeHourStudentSlots", state.selectedOfficeHourSlot, false);
-  renderSlotGrid("examReviewOrganizerSlots", state.selectedOrganizerExamSlots, true);
-  renderSlotGrid("officeHourOrganizerSlots", state.selectedOrganizerOfficeSlots, true);
-}
+async function loadAvailableStudentSessions(sessionType) {
+  const targetBody =
+    sessionType === "review" ? examReviewStudentListBody : officeHourStudentListBody;
 
-async function prepareTutorRequestView() {
-  state.availableTutors = [];
-  state.selectedTutorId = null;
-  renderTutorList();
+  if (!targetBody || !state.user) return;
+
+  targetBody.innerHTML = "";
 
   try {
-    const tutors = await apiFetch(`/users/tutors/${encodeURIComponent(DEFAULT_COURSE)}`);
-    state.availableTutors = tutors || [];
-  } catch (error) {
-    state.availableTutors = [];
-  }
+    const sessions = await apiFetch("/sessions");
 
-  renderTutorList();
-}
-
-function renderTutorList() {
-  if (!tutorList) return;
-  tutorList.innerHTML = "";
-
-  if (!state.availableTutors.length) {
-    tutorList.innerHTML = `<div>No tutors found for ${DEFAULT_COURSE}.</div>`;
-    return;
-  }
-
-  state.availableTutors.forEach((tutor) => {
-    const tutorId = tutor._id || tutor.id;
-    const card = document.createElement("div");
-    card.className = `tutor-card ${state.selectedTutorId === tutorId ? "selected" : ""}`;
-    card.innerHTML = `
-      <div class="tutor-photo">Tutor</div>
-      <div class="tutor-meta">| name: ${tutor.name}</div>
-      <div class="tutor-meta">| responsible class: ${DEFAULT_COURSE}</div>
-      <div class="tutor-meta">| email: ${tutor.email}</div>
-    `;
-
-    card.addEventListener("click", () => {
-      state.selectedTutorId = tutorId;
-      renderTutorList();
+    const filtered = sessions.filter((session) => {
+      if (session.sessionType !== sessionType) return false;
+      if (userIsCreator(session)) return false;
+      if (userIsAttendee(session)) return false;
+      return true;
     });
 
-    tutorList.appendChild(card);
-  });
+    if (!filtered.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="6">No available sessions right now.</td>`;
+      targetBody.appendChild(tr);
+      return;
+    }
+
+    filtered.forEach((session) => {
+      const tr = document.createElement("tr");
+
+      tr.innerHTML = `
+        <td>${session.course || DEFAULT_COURSE}</td>
+        <td>${session.createdBy?.name || "Unknown"}</td>
+        <td>${formatDateOnly(session.startTime)}</td>
+        <td>${formatTimeRange(session.startTime, session.endTime)}</td>
+        <td>${session.location || "TBD"}</td>
+        <td></td>
+      `;
+
+      const actionCell = tr.lastElementChild;
+      const joinBtn = document.createElement("button");
+      joinBtn.className = "table-action-btn clickable-text";
+      joinBtn.textContent = "Join";
+
+      joinBtn.addEventListener("click", async () => {
+        try {
+          const result = await apiFetch(`/sessions/${session._id}/join`, {
+            method: "PUT",
+            body: JSON.stringify({ userId: state.user.id })
+          });
+
+          const joinedSession = result.session || session;
+
+          state.lastReservation = {
+            mode: "joined",
+            sessionId: joinedSession._id || session._id,
+            location: joinedSession.location || session.location || "TBD"
+          };
+
+          state.latestConfirmation = buildSuccessHtml(
+            mapSubject(joinedSession.title || session.title, joinedSession.sessionType || session.sessionType),
+            [
+              `<div>Date: ${formatDateTimeForSuccess(joinedSession.startTime || session.startTime)}</div>`,
+              `<div>Time: ${formatTimeRange(joinedSession.startTime || session.startTime, joinedSession.endTime || session.endTime)}</div>`,
+              `<div>Location/Link: ${joinedSession.location || session.location || "TBD"}</div>`
+            ]
+          );
+
+          syncSuccessButtons();
+          showAppView("successView");
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
+
+      actionCell.appendChild(joinBtn);
+      targetBody.appendChild(tr);
+    });
+  } catch (error) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6">${error.message}</td>`;
+    targetBody.appendChild(tr);
+  }
 }
 
 function buildSuccessHtml(title, extraLines = []) {
@@ -818,37 +708,11 @@ function syncSuccessButtons() {
   successModifyBtn.disabled = !hasReservation || state.lastReservation?.mode !== "created";
 }
 
-async function joinMatchingSession(sessionType, slot) {
-  const match = state.availableSessions.find((session) => {
-    return session.sessionType === sessionType &&
-      sameSelectedDay(session.startTime) &&
-      sessionMatchesSlot(session, slot) &&
-      !userIsAttendee(session);
-  });
-
-  if (!match) {
-    throw new Error(
-      "No matching reservation for that timeslot. This usually means an organizer has not created a session for that date/time yet."
-    );
-  }
-
-  await apiFetch(`/sessions/${match._id}/join`, {
-    method: "PUT",
-    body: JSON.stringify({ userId: state.user.id })
-  });
-
-  return match;
-}
-
-async function createOrganizerSession({ title, sessionType, slot, location, course }) {
-  const hours = slotToHours(slot);
-  if (!hours) throw new Error("Invalid time slot.");
-
-  const date = String(state.selectedDate).padStart(2, "0");
-  const startTime = new Date(`2026-10-${date}T${hours.startHour}:00:00`).toISOString();
-  const endTime = new Date(`2026-10-${date}T${hours.endHour}:00:00`).toISOString();
-
+async function createOrganizerSession({ title, sessionType, course, date, startTime, endTime, location }) {
   const normalizedCourse = normalizeCourse(course || DEFAULT_COURSE);
+
+  const startIso = new Date(`${date}T${startTime}:00`).toISOString();
+  const endIso = new Date(`${date}T${endTime}:00`).toISOString();
 
   const data = await apiFetch("/sessions", {
     method: "POST",
@@ -856,40 +720,14 @@ async function createOrganizerSession({ title, sessionType, slot, location, cour
       title,
       course: normalizedCourse,
       sessionType,
-      startTime,
-      endTime,
+      startTime: startIso,
+      endTime: endIso,
       location,
       createdBy: state.user.id
     })
   });
 
   return data.session;
-}
-
-function resetStudentSelections() {
-  state.selectedTutorSlots = [];
-  state.selectedTutorId = null;
-  state.selectedExamSlot = null;
-  state.selectedOfficeHourSlot = null;
-  state.availableTutors = [];
-  const tutorMessage = document.getElementById("tutorMessage");
-  if (tutorMessage) tutorMessage.value = "";
-  rerenderSlots();
-}
-
-function resetOrganizerSelections() {
-  state.selectedOrganizerExamSlots = [];
-  state.selectedOrganizerOfficeSlots = [];
-  const examHost = document.getElementById("examOrganizerHostRoom");
-  const examZoom = document.getElementById("examOrganizerZoomLink");
-  const officeHost = document.getElementById("officeOrganizerHostRoom");
-  const officeZoom = document.getElementById("officeOrganizerZoomLink");
-
-  if (examHost) examHost.value = "";
-  if (examZoom) examZoom.value = "";
-  if (officeHost) officeHost.value = "";
-  if (officeZoom) officeZoom.value = "";
-  rerenderSlots();
 }
 
 async function cancelLastReservation() {
@@ -959,9 +797,9 @@ async function saveModifyModal() {
     closeModifyModal();
 
     if (state.mode === "organizer") {
-      loadOrganizerReservations();
+      await loadOrganizerReservations();
     } else {
-      loadStudentReservations();
+      await loadStudentReservations();
     }
   } catch (error) {
     showMessage(error.message);
@@ -972,18 +810,17 @@ document.querySelectorAll("[data-auth-target]").forEach((btn) => {
   btn.addEventListener("click", () => showAuthView(`${btn.dataset.authTarget}View`));
 });
 
-if (brandHomeBtn) {
-  brandHomeBtn.addEventListener("click", () => {
+document.querySelectorAll("[data-back-home]").forEach((btn) => {
+  btn.addEventListener("click", () => {
     if (!state.user) {
       showAuthView("loginView");
       return;
     }
 
-    state.currentView = getHomeViewForCurrentUser();
-    showAppView(state.currentView);
+    showAppView(getHomeViewForCurrentUser());
     toggleSubjectDropdown(false);
   });
-}
+});
 
 if (subjectDropdownToggle) {
   subjectDropdownToggle.addEventListener("click", () => {
@@ -1050,9 +887,23 @@ if (registerForm) {
 
 const resetForm = document.getElementById("resetForm");
 if (resetForm) {
-  resetForm.addEventListener("submit", (event) => {
+  resetForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    showAuthView("resetSentView");
+
+    try {
+      await apiFetch("/users/reset-password", {
+        method: "PUT",
+        body: JSON.stringify({
+          email: document.getElementById("resetEmail").value.trim(),
+          newPassword: document.getElementById("resetNewPassword").value
+        })
+      });
+
+      showAuthView("resetSentView");
+      showMessage("Password updated.");
+    } catch (error) {
+      showMessage(error.message);
+    }
   });
 }
 
@@ -1122,8 +973,49 @@ if (toTutorSelectionBtn) {
       return;
     }
 
-    await prepareTutorRequestView();
-    showAppView("chooseTutorView");
+    try {
+      const tutors = await apiFetch(`/users/tutors/${encodeURIComponent(DEFAULT_COURSE)}`);
+      state.availableTutors = tutors || [];
+      state.selectedTutorId = null;
+
+      if (!state.availableTutors.length) {
+        showMessage("No approved tutors are available for COMP307 right now.");
+        return;
+      }
+
+      showAppView("chooseTutorView");
+    } catch (error) {
+      showMessage(error.message);
+    }
+  });
+}
+
+function renderTutorList() {
+  if (!tutorList) return;
+  tutorList.innerHTML = "";
+
+  if (!state.availableTutors.length) {
+    tutorList.innerHTML = `<div>No tutors found for ${DEFAULT_COURSE}.</div>`;
+    return;
+  }
+
+  state.availableTutors.forEach((tutor) => {
+    const tutorId = tutor._id || tutor.id;
+    const card = document.createElement("div");
+    card.className = `tutor-card ${state.selectedTutorId === tutorId ? "selected" : ""}`;
+    card.innerHTML = `
+      <div class="tutor-photo">Tutor</div>
+      <div class="tutor-meta">| name: ${tutor.name}</div>
+      <div class="tutor-meta">| responsible class: ${DEFAULT_COURSE}</div>
+      <div class="tutor-meta">| email: ${tutor.email}</div>
+    `;
+
+    card.addEventListener("click", () => {
+      state.selectedTutorId = tutorId;
+      renderTutorList();
+    });
+
+    tutorList.appendChild(card);
   });
 }
 
@@ -1150,7 +1042,7 @@ if (submitTutorRequestBtn) {
     }
 
     try {
-      await apiFetch("/users/request-tutor", {
+      const result = await apiFetch("/users/request-tutor", {
         method: "POST",
         body: JSON.stringify({
           studentId: state.user.id,
@@ -1163,101 +1055,31 @@ if (submitTutorRequestBtn) {
       state.latestConfirmation = buildSuccessHtml("Request a tutor", [
         `<div>Requested course: ${DEFAULT_COURSE}</div>`,
         `<div>Selected time slot(s): ${state.selectedTutorSlots.join(". ")}</div>`,
-        `<div>Message: ${message || "No message provided."}</div>`
+        `<div>${result.message || "Tutor request sent successfully."}</div>`
       ]);
 
       state.lastReservation = null;
       syncSuccessButtons();
       showAppView("successView");
-      resetStudentSelections();
     } catch (error) {
       showMessage(error.message);
     }
   });
 }
 
-const submitExamReviewStudentBtn = document.getElementById("submitExamReviewStudentBtn");
-if (submitExamReviewStudentBtn) {
-  submitExamReviewStudentBtn.addEventListener("click", async () => {
-    if (!state.selectedExamSlot) {
-      showMessage("Select a time slot.");
-      return;
-    }
-
-    try {
-      const joinedSession = await joinMatchingSession("review", state.selectedExamSlot);
-
-      state.lastReservation = {
-        mode: "joined",
-        sessionId: joinedSession._id,
-        location: joinedSession.location
-      };
-
-      state.latestConfirmation = buildSuccessHtml("Exam review", [
-        `<div>Selected time slot: ${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${state.selectedExamSlot}</div>`,
-        `<div>Location/Link: ${joinedSession.location || "TBD"}</div>`
-      ]);
-
-      syncSuccessButtons();
-      showAppView("successView");
-      resetStudentSelections();
-    } catch (error) {
-      showMessage(error.message);
-    }
-  });
-}
-
-const submitOfficeHourStudentBtn = document.getElementById("submitOfficeHourStudentBtn");
-if (submitOfficeHourStudentBtn) {
-  submitOfficeHourStudentBtn.addEventListener("click", async () => {
-    if (!state.selectedOfficeHourSlot) {
-      showMessage("Select a time slot.");
-      return;
-    }
-
-    try {
-      const joinedSession = await joinMatchingSession("office-hour", state.selectedOfficeHourSlot);
-
-      state.lastReservation = {
-        mode: "joined",
-        sessionId: joinedSession._id,
-        location: joinedSession.location
-      };
-
-      state.latestConfirmation = buildSuccessHtml("Library drop-in/ office hours", [
-        `<div>Selected time slot(s):</div>`,
-        `<div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${state.selectedOfficeHourSlot} at ${joinedSession.location || "TBD"}.</div>`
-      ]);
-
-      syncSuccessButtons();
-      showAppView("successView");
-      resetStudentSelections();
-    } catch (error) {
-      showMessage(error.message);
-    }
-  });
-}
-
-const submitExamReviewOrganizerBtn = document.getElementById("submitExamReviewOrganizerBtn");
-if (submitExamReviewOrganizerBtn) {
-  submitExamReviewOrganizerBtn.addEventListener("click", async () => {
-    const slot = state.selectedOrganizerExamSlots[0];
-    if (!slot) {
-      showMessage("Select at least one time slot.");
-      return;
-    }
-
-    const hostRoom = document.getElementById("examOrganizerHostRoom").value.trim();
-    const zoomLink = document.getElementById("examOrganizerZoomLink").value.trim();
-    const location = hostRoom || zoomLink || "TBD";
+if (examReviewOrganizerForm) {
+  examReviewOrganizerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
     try {
       const created = await createOrganizerSession({
         title: "Exam review",
         sessionType: "review",
-        slot,
-        location,
-        course: DEFAULT_COURSE
+        course: document.getElementById("examOrganizerCourse").value,
+        date: document.getElementById("examOrganizerDate").value,
+        startTime: document.getElementById("examOrganizerStartTime").value,
+        endTime: document.getElementById("examOrganizerEndTime").value,
+        location: document.getElementById("examOrganizerLocation").value.trim()
       });
 
       state.lastReservation = {
@@ -1267,41 +1089,33 @@ if (submitExamReviewOrganizerBtn) {
       };
 
       state.latestConfirmation = buildSuccessHtml("Exam review", [
-        `<div>Selected time slot(s):</div>`,
-        `<div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${slot}</div>`,
+        `<div>Date: ${formatDateTimeForSuccess(created.startTime)}</div>`,
+        `<div>Time: ${formatTimeRange(created.startTime, created.endTime)}</div>`,
         `<div>Location/Link: ${created.location}</div>`
       ]);
 
       syncSuccessButtons();
       showAppView("successView");
-      resetOrganizerSelections();
-      refreshAvailableSessions();
+      await loadOrganizerReservations();
     } catch (error) {
       showMessage(error.message);
     }
   });
 }
 
-const submitOfficeHourOrganizerBtn = document.getElementById("submitOfficeHourOrganizerBtn");
-if (submitOfficeHourOrganizerBtn) {
-  submitOfficeHourOrganizerBtn.addEventListener("click", async () => {
-    const slot = state.selectedOrganizerOfficeSlots[0];
-    if (!slot) {
-      showMessage("Select at least one time slot.");
-      return;
-    }
-
-    const hostRoom = document.getElementById("officeOrganizerHostRoom").value.trim();
-    const zoomLink = document.getElementById("officeOrganizerZoomLink").value.trim();
-    const location = hostRoom || zoomLink || "TBD";
+if (officeHourOrganizerForm) {
+  officeHourOrganizerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
     try {
       const created = await createOrganizerSession({
         title: "Library drop-in/ office hours",
         sessionType: "office-hour",
-        slot,
-        location,
-        course: DEFAULT_COURSE
+        course: document.getElementById("officeOrganizerCourse").value,
+        date: document.getElementById("officeOrganizerDate").value,
+        startTime: document.getElementById("officeOrganizerStartTime").value,
+        endTime: document.getElementById("officeOrganizerEndTime").value,
+        location: document.getElementById("officeOrganizerLocation").value.trim()
       });
 
       state.lastReservation = {
@@ -1311,15 +1125,14 @@ if (submitOfficeHourOrganizerBtn) {
       };
 
       state.latestConfirmation = buildSuccessHtml("Library drop-in/ office hours", [
-        `<div>Selected time slot(s):</div>`,
-        `<div>${currentYearMonthLabel}/${String(state.selectedDate).padStart(2, "0")}: ${slot}</div>`,
+        `<div>Date: ${formatDateTimeForSuccess(created.startTime)}</div>`,
+        `<div>Time: ${formatTimeRange(created.startTime, created.endTime)}</div>`,
         `<div>Location/Link: ${created.location}</div>`
       ]);
 
       syncSuccessButtons();
       showAppView("successView");
-      resetOrganizerSelections();
-      refreshAvailableSessions();
+      await loadOrganizerReservations();
     } catch (error) {
       showMessage(error.message);
     }
@@ -1354,27 +1167,32 @@ if (modifyModal) {
 
 if (changePasswordBtn) {
   changePasswordBtn.addEventListener("click", () => {
-    showMessage("Change password is not available yet because the backend does not have a password-change route.");
+    if (!state.user) return;
+    showAuthView("resetView");
+    if (authSection) authSection.classList.remove("hidden");
+    if (appSection) appSection.classList.add("hidden");
+
+    const resetEmail = document.getElementById("resetEmail");
+    if (resetEmail) resetEmail.value = state.user.email;
   });
 }
 
-[
-  "requestTutorCalendar",
-  "examReviewStudentCalendar",
-  "officeHourStudentCalendar",
-  "examReviewOrganizerCalendar",
-  "officeHourOrganizerCalendar"
-].forEach((id) => {
-  if (document.getElementById(id)) renderCalendar(id);
-});
+if (brandHomeBtn) {
+  brandHomeBtn.addEventListener("click", () => {
+    if (!state.user) {
+      showAuthView("loginView");
+      return;
+    }
 
-rerenderSlots();
-syncSuccessButtons();
+    state.currentView = getHomeViewForCurrentUser();
+    showAppView(state.currentView);
+    toggleSubjectDropdown(false);
+  });
+}
 
 if (state.user) {
   inferModeAndView();
   renderApp();
-  refreshAvailableSessions();
 } else {
   renderApp();
   showAuthView("loginView");

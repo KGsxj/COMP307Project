@@ -93,14 +93,25 @@
           <label for="resetEmail">Email</label>
           <input id="resetEmail" type="email" required />
 
+          <label for="resetNewPassword">New password</label>
+          <input id="resetNewPassword" type="password" required />
+
+          <button
+            type="button"
+            class="plain-link auth-link clickable-text"
+            data-auth-target="login"
+          >
+            Return to login
+          </button>
+
           <div class="login-button-row">
-            <button type="submit" class="small-action-btn">Send email</button>
+            <button type="submit" class="small-action-btn">Reset password</button>
           </div>
         </form>
       </div>
 
       <div id="resetSentView" class="auth-view hidden">
-        <div class="reset-sent-text">An Email has been sent.</div>
+        <div class="reset-sent-text">Password updated successfully.</div>
 
         <button
           type="button"
@@ -178,6 +189,8 @@
 
       <section id="accountView" class="app-view hidden">
         <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
           <div class="simple-page-title">Account</div>
 
           <div class="account-layout">
@@ -204,6 +217,8 @@
 
       <section id="studentOrganizerRequestView" class="app-view hidden">
         <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
           <div class="request-title">Request to become an organizer</div>
 
           <form id="organizerRequestForm" class="request-box-form">
@@ -240,6 +255,8 @@
 
       <section id="taRequestView" class="app-view hidden">
         <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
           <div class="request-title">Request to become an organizer</div>
 
           <form id="taRequestForm" class="request-box-form">
@@ -268,33 +285,30 @@
       </section>
 
       <section id="requestTutorStep1View" class="app-view hidden">
-        <div class="calendar-slot-page">
-          <div class="flow-label">*Request a tutor</div>
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="calendar-slot-columns">
-            <div>
-              <div class="calendar-title">Select date</div>
-              <div id="requestTutorCalendar" class="mock-calendar"></div>
-            </div>
+          <div class="simple-page-title">Request a tutor</div>
 
+          <div class="request-tutor-layout">
             <div>
-              <div class="calendar-title">
-                Select your desired time slot (up to three)
-              </div>
+              <div class="calendar-title">Select your desired time slots (up to three)</div>
               <div id="requestTutorSlots" class="slot-grid"></div>
-
-              <div class="confirm-row">
-                <button id="toTutorSelectionBtn" class="small-action-btn" type="button">
-                  Confirm
-                </button>
-              </div>
             </div>
+          </div>
+
+          <div class="confirm-row">
+            <button id="toTutorSelectionBtn" class="small-action-btn" type="button">
+              Confirm
+            </button>
           </div>
         </div>
       </section>
 
       <section id="chooseTutorView" class="app-view hidden">
         <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
           <div class="simple-page-title">Choose your Tutor</div>
           <div id="tutorList" class="tutor-grid"></div>
 
@@ -308,6 +322,8 @@
 
       <section id="tutorMessageView" class="app-view hidden">
         <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
           <div class="confirm-row left">
             <button id="submitTutorRequestBtn" class="small-action-btn" type="button">
               Confirm
@@ -324,138 +340,154 @@
       </section>
 
       <section id="examReviewStudentView" class="app-view hidden">
-        <div class="calendar-slot-page">
-          <div class="flow-label">*Exam review</div>
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="calendar-slot-columns">
-            <div>
-              <div class="calendar-title">Select your available days</div>
-              <div id="examReviewStudentCalendar" class="mock-calendar"></div>
-            </div>
+          <div class="simple-page-title">Exam review</div>
+          <div class="list-page-subtitle">Available study sessions</div>
 
-            <div>
-              <div class="calendar-title">Select your time slot</div>
-              <div id="examReviewStudentSlots" class="slot-grid"></div>
-
-              <div class="confirm-row">
-                <button id="submitExamReviewStudentBtn" class="small-action-btn" type="button">
-                  Confirm
-                </button>
-              </div>
-            </div>
+          <div class="reservation-table-wrapper">
+            <table class="reservation-table">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Host</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Location/Link</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="examReviewStudentListBody"></tbody>
+            </table>
           </div>
         </div>
       </section>
 
       <section id="officeHourStudentView" class="app-view hidden">
-        <div class="calendar-slot-page">
-          <div class="flow-label">*Library drop-in/office hour</div>
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="calendar-slot-columns">
-            <div>
-              <div class="calendar-title">Select your available days</div>
-              <div id="officeHourStudentCalendar" class="mock-calendar"></div>
-            </div>
+          <div class="simple-page-title">Library drop-in/office hours</div>
+          <div class="list-page-subtitle">Available study sessions</div>
 
-            <div>
-              <div class="calendar-title">Select your time slot</div>
-              <div id="officeHourStudentSlots" class="slot-grid"></div>
-
-              <div class="confirm-row">
-                <button id="submitOfficeHourStudentBtn" class="small-action-btn" type="button">
-                  Confirm
-                </button>
-              </div>
-            </div>
+          <div class="reservation-table-wrapper">
+            <table class="reservation-table">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Host</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Location/Link</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="officeHourStudentListBody"></tbody>
+            </table>
           </div>
         </div>
       </section>
 
       <section id="examReviewOrganizerView" class="app-view hidden">
-        <div class="calendar-slot-page">
-          <div class="flow-label">*Exam review</div>
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="calendar-slot-columns">
-            <div>
-              <div class="calendar-title">Select your available days</div>
-              <div id="examReviewOrganizerCalendar" class="mock-calendar"></div>
+          <div class="simple-page-title">Create Exam review session</div>
+
+          <form id="examReviewOrganizerForm" class="create-session-form">
+            <label>
+              Course
+              <input id="examOrganizerCourse" type="text" value="COMP307" />
+            </label>
+
+            <label>
+              Date
+              <input id="examOrganizerDate" type="date" required />
+            </label>
+
+            <label>
+              Start time
+              <input id="examOrganizerStartTime" type="time" required />
+            </label>
+
+            <label>
+              End time
+              <input id="examOrganizerEndTime" type="time" required />
+            </label>
+
+            <label>
+              Location / Link
+              <input id="examOrganizerLocation" type="text" placeholder="e.g. Redpath 361 or Zoom link" required />
+            </label>
+
+            <div class="confirm-row">
+              <button id="submitExamReviewOrganizerBtn" class="small-action-btn" type="submit">
+                Confirm
+              </button>
             </div>
-
-            <div>
-              <div class="calendar-title">Select time slots</div>
-              <div id="examReviewOrganizerSlots" class="slot-grid"></div>
-
-              <div class="organizer-meta-box">
-                <label class="organizer-meta-line">
-                  <span>Host room:</span>
-                  <input id="examOrganizerHostRoom" type="text" placeholder="e.g. Redpath 361" />
-                </label>
-
-                <label class="organizer-meta-line">
-                  <span>Zoom link:</span>
-                  <input id="examOrganizerZoomLink" type="text" placeholder="e.g. https://zoom.us/..." />
-                </label>
-              </div>
-
-              <div class="confirm-row">
-                <button id="submitExamReviewOrganizerBtn" class="small-action-btn" type="button">
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>
+          </form>
         </div>
       </section>
 
       <section id="officeHourOrganizerView" class="app-view hidden">
-        <div class="calendar-slot-page">
-          <div class="flow-label">*Library drop-in/office hour</div>
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="calendar-slot-columns">
-            <div>
-              <div class="calendar-title">Select your available days</div>
-              <div id="officeHourOrganizerCalendar" class="mock-calendar"></div>
+          <div class="simple-page-title">Create Library drop-in/office hour session</div>
+
+          <form id="officeHourOrganizerForm" class="create-session-form">
+            <label>
+              Course
+              <input id="officeOrganizerCourse" type="text" value="COMP307" />
+            </label>
+
+            <label>
+              Date
+              <input id="officeOrganizerDate" type="date" required />
+            </label>
+
+            <label>
+              Start time
+              <input id="officeOrganizerStartTime" type="time" required />
+            </label>
+
+            <label>
+              End time
+              <input id="officeOrganizerEndTime" type="time" required />
+            </label>
+
+            <label>
+              Location / Link
+              <input id="officeOrganizerLocation" type="text" placeholder="e.g. Redpath 361 or Zoom link" required />
+            </label>
+
+            <div class="confirm-row">
+              <button id="submitOfficeHourOrganizerBtn" class="small-action-btn" type="submit">
+                Confirm
+              </button>
             </div>
-
-            <div>
-              <div class="calendar-title">Select time slots</div>
-              <div id="officeHourOrganizerSlots" class="slot-grid"></div>
-
-              <div class="organizer-meta-box">
-                <label class="organizer-meta-line">
-                  <span>Host room:</span>
-                  <input id="officeOrganizerHostRoom" type="text" placeholder="e.g. Redpath 361" />
-                </label>
-
-                <label class="organizer-meta-line">
-                  <span>Zoom link:</span>
-                  <input id="officeOrganizerZoomLink" type="text" placeholder="e.g. https://zoom.us/..." />
-                </label>
-              </div>
-
-              <div class="confirm-row">
-                <button id="submitOfficeHourOrganizerBtn" class="small-action-btn" type="button">
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>
+          </form>
         </div>
       </section>
 
       <section id="successView" class="app-view hidden">
-        <div class="success-card">
-          <div class="success-card-title">Reservation successful</div>
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div id="successSummary" class="success-summary"></div>
+          <div class="success-card">
+            <div class="success-card-title">Reservation successful</div>
 
-          <div class="success-card-actions">
-            <button id="successCancelBtn" class="success-action-btn" type="button">
-              Cancel reservation
-            </button>
-            <button id="successModifyBtn" class="success-action-btn" type="button">
-              Modify reservation
-            </button>
+            <div id="successSummary" class="success-summary"></div>
+
+            <div class="success-card-actions">
+              <button id="successCancelBtn" class="success-action-btn" type="button">
+                Cancel reservation
+              </button>
+              <button id="successModifyBtn" class="success-action-btn" type="button">
+                Modify reservation
+              </button>
+            </div>
           </div>
         </div>
       </section>

@@ -5,10 +5,6 @@
   --border: #222222;
   --slot-border: #63a8dc;
   --slot-fill: #55afe3;
-  --day-fill: #efefef;
-  --day-selected: #5a60e8;
-  --day-disabled: #d3d3d3;
-  --day-disabled-text: #8a8a8a;
 }
 
 * {
@@ -97,8 +93,6 @@ body {
 
 .auth-shell {
   width: 100%;
-  max-width: none;
-  margin: 0;
   padding: 12px 0 0;
 }
 
@@ -126,10 +120,9 @@ body {
 }
 
 .login-form input,
-.simple-form input,
 textarea,
-.organizer-meta-line input,
-.modal-field input {
+.modal-field input,
+.create-session-form input {
   width: 100%;
   min-height: 56px;
   border: 2px solid var(--border);
@@ -175,6 +168,17 @@ textarea {
   cursor: pointer;
 }
 
+.back-home-btn {
+  min-width: 150px;
+  min-height: 44px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: #000;
+  font-size: 20px;
+  cursor: pointer;
+  margin-bottom: 18px;
+}
+
 .reset-sent-text {
   text-align: center;
   font-size: 30px;
@@ -210,6 +214,11 @@ textarea {
   font-size: 26px;
   font-weight: 400;
   margin-bottom: 10px;
+}
+
+.list-page-subtitle {
+  font-size: 22px;
+  margin-bottom: 18px;
 }
 
 .dropdown-card {
@@ -281,7 +290,7 @@ textarea {
 .dropdown-button,
 .table-action-btn {
   cursor: pointer;
-  transition: opacity 0.15s ease, text-decoration-color 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .clickable-text:hover,
@@ -326,15 +335,6 @@ textarea {
   font: inherit;
 }
 
-.table-action-btn:focus,
-.subject-option:focus,
-.dropdown-button:focus,
-.action-box button:focus,
-.clickable-text:focus {
-  outline: 2px solid #666;
-  outline-offset: 2px;
-}
-
 .reservation-table-wrapper {
   overflow-x: auto;
 }
@@ -372,12 +372,9 @@ textarea {
 .account-logo-box {
   width: 180px;
   min-height: 140px;
-  background: transparent;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 0;
-  border: 0;
 }
 
 .account-logo-img {
@@ -385,8 +382,6 @@ textarea {
   height: 120px;
   object-fit: cover;
   display: block;
-  background: transparent;
-  border: 0;
 }
 
 .account-details {
@@ -445,10 +440,6 @@ textarea {
   box-shadow: none;
 }
 
-.request-inline-input:focus {
-  outline: none;
-}
-
 .readonly-inline-input {
   pointer-events: none;
 }
@@ -473,20 +464,10 @@ textarea {
   cursor: pointer;
 }
 
-.calendar-slot-page {
-  padding-top: 4px;
-}
-
-.flow-label {
-  font-size: 24px;
-  margin-bottom: 12px;
-}
-
-.calendar-slot-columns {
+.request-tutor-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: start;
+  grid-template-columns: 1fr;
+  gap: 24px;
 }
 
 .calendar-title {
@@ -495,58 +476,11 @@ textarea {
   margin-bottom: 18px;
 }
 
-.calendar-slot-columns > div:last-child .calendar-title {
-  max-width: 420px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.mock-calendar {
-  width: 100%;
-  max-width: 430px;
-}
-
-.calendar-weekdays,
-.calendar-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 16px;
-}
-
-.calendar-weekdays {
-  margin-bottom: 16px;
-  color: #666;
-  text-align: center;
-}
-
-.calendar-day {
-  height: 54px;
-  border-radius: 6px;
-  background: var(--day-fill);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.calendar-day.selected {
-  background: var(--day-selected);
-  color: #fff;
-}
-
-.calendar-day.disabled {
-  background: var(--day-disabled);
-  color: var(--day-disabled-text);
-  cursor: default;
-}
-
 .slot-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px 18px;
   max-width: 420px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .slot-btn {
@@ -566,26 +500,6 @@ textarea {
   background: var(--slot-fill);
 }
 
-.organizer-meta-box {
-  width: 100%;
-  max-width: 420px;
-  border: 2px solid var(--border);
-  padding: 12px;
-  margin: 18px auto 0;
-  display: grid;
-  gap: 12px;
-}
-
-.organizer-meta-line {
-  display: grid;
-  gap: 8px;
-  font-size: 18px;
-}
-
-.organizer-meta-line input {
-  min-height: 40px;
-}
-
 .confirm-row {
   display: flex;
   justify-content: flex-end;
@@ -594,6 +508,7 @@ textarea {
 
 .confirm-row.left {
   justify-content: flex-start;
+  margin-top: 4px;
 }
 
 .tutor-grid {
@@ -629,6 +544,18 @@ textarea {
 .tutor-meta {
   font-size: 18px;
   line-height: 1.4;
+}
+
+.create-session-form {
+  max-width: 700px;
+  display: grid;
+  gap: 16px;
+}
+
+.create-session-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 22px;
 }
 
 .success-card {
@@ -780,7 +707,6 @@ textarea {
   }
 
   .account-layout,
-  .calendar-slot-columns,
   .admin-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -792,10 +718,7 @@ textarea {
     gap: 6px;
   }
 
-  .tutor-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .tutor-grid,
   .slot-grid {
     grid-template-columns: 1fr;
   }
