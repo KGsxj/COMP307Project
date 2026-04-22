@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
     course: { type: String, required: true },
     requestedTutor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     message: { type: String },
+    status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });

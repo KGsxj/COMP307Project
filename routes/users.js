@@ -303,11 +303,26 @@ router.post('/request-tutor', async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     }
 
+    // Check if the student already has a pending request for this specific TA and course
+    const alreadyRequested = student.tutorRequests.some(
+      (request) => 
+        request.requestedTutor.toString() === tutorId && 
+        request.course === course && 
+        (request.status === 'pending' || request.status === 'accepted')
+    );
+
+    if (alreadyRequested) {
+      return res.status(400).json({ 
+        error: `You already have a pending request with ${tutor.name} for ${course}.` 
+      });
+    }
+
     // SAVE TO DATABASE 
     student.tutorRequests.push({
         course: course,
         requestedTutor: tutorId,
-        message: message || "No message provided."
+        message: message || "No message provided.",
+        status: 'pending'
     });
     await student.save();
 
@@ -319,6 +334,74 @@ router.post('/request-tutor', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to send tutor request." });
+  }
+});
+
+// Route: GET /api/users/tutor-requests/:tutorId
+// Fetch all pending requests sent to a specific TA
+router.get('/tutor-requests/:tutorId', async (req, res) => {
+  try {
+    const tutorId = req.params.tutorId;
+
+    // Find all students who have a pending request for this tutor
+    const students = await User.find(
+      { tutorRequests: { $elemMatch: { requestedTutor: tutorId, status: 'pending' } } },
+      'name email tutorRequests' // Only pull the data we actually need
+    );
+
+    // Clean up the data so the frontend only gets this specific TA's requests
+    let pendingRequests = [];
+    students.forEach(student => {
+      student.tutorRequests.forEach(request => {
+        if (request.requestedTutor.toString() === tutorId && request.status === 'pending') {
+          pendingRequests.push({
+            studentId: student._id,
+            studentName: student.name,
+            studentEmail: student.email,
+            requestId: request._id,
+            course: request.course,
+            message: request.message,
+            createdAt: request.createdAt
+          });
+        }
+      });
+    });
+
+    res.status(200).json(pendingRequests);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch tutor requests." });
+  }
+});
+
+// Route: PUT /api/users/tutor-requests/:studentId/:requestId
+// Allows the TA to accept or decline a request
+router.put('/tutor-requests/:studentId/:requestId', async (req, res) => {
+  try {
+    const { studentId, requestId } = req.params;
+    const { action } = req.body; // Frontend will send {"action": "accepted"} or {"action": "declined"}
+
+    if (action !== 'accepted' && action !== 'declined') {
+      return res.status(400).json({ error: "Action must be 'accepted' or 'declined'." });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) return res.status(404).json({ error: "Student not found." });
+
+    // Find the specific request inside the student's array
+    const request = student.tutorRequests.id(requestId);
+    if (!request) return res.status(404).json({ error: "Request not found." });
+
+    // Update the status and save
+    request.status = action;
+    await student.save();
+
+    res.status(200).json({ message: `Request successfully ${action}!` });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update request." });
   }
 });
 
