@@ -405,4 +405,41 @@ router.put('/tutor-requests/:studentId/:requestId', async (req, res) => {
   }
 });
 
+// Route: GET /api/users/my-tutor-requests/:studentId
+// Fetch all tutor requests made BY a specific student
+router.get('/my-tutor-requests/:studentId', async (req, res) => {
+  try {
+    const studentId = req.params.studentId;
+
+    // Find the student and POPULATE the tutor's name and email
+    const student = await User.findById(studentId)
+      .populate('tutorRequests.requestedTutor', 'name email');
+
+    if (!student) {
+      return res.status(404).json({ error: "Student not found." });
+    }
+
+    // Format the data cleanly
+    const formattedRequests = student.tutorRequests.map(request => {
+      return {
+        requestId: request._id,
+        tutorName: request.requestedTutor ? request.requestedTutor.name : 'Unknown Tutor',
+        course: request.course,
+        message: request.message,
+        status: request.status,
+        createdAt: request.createdAt
+      };
+    });
+
+    // Sort from the newest to oldest
+    formattedRequests.sort((a, b) => b.createdAt - a.createdAt);
+
+    res.status(200).json(formattedRequests);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch your tutor requests." });
+  }
+});
+
 module.exports = router;
