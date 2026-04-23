@@ -2,6 +2,70 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User'); // Import the blueprint we just made!
 
+function legacyPreferredDateFromMessage(message) {
+  if (!message) return '';
+  const match = message.match(/Preferred date:\s*([^\n\r]+)/i);
+  return match ? match[1].trim() : '';
+}
+
+function legacyPreferredTimeFromMessage(message) {
+  if (!message) return '';
+  const match = message.match(/Preferred time:\s*([^\n\r]+)/i);
+  return match ? match[1].trim() : '';
+}
+
+function legacyPlainMessageFromCombined(message) {
+  if (!message) return '';
+  const match = message.match(/Message:\s*([\s\S]*)/i);
+  return match ? match[1].trim() : message.trim();
+}
+
+function hasStructuredTutorTimes(reqDoc) {
+  return !!(reqDoc.preferredDate && reqDoc.preferredTimeStart && reqDoc.preferredTimeEnd);
+}
+
+function resolveTutorRequestDisplay(reqDoc) {
+  let preferredDate = (reqDoc.preferredDate || '').trim();
+  let preferredTime = '';
+  if (reqDoc.preferredTimeStart && reqDoc.preferredTimeEnd) {
+    preferredTime = `${reqDoc.preferredTimeStart}-${reqDoc.preferredTimeEnd}`;
+  }
+  let studentMessage = (reqDoc.message || '').trim();
+
+  if (!hasStructuredTutorTimes(reqDoc) && reqDoc.message) {
+    const ld = legacyPreferredDateFromMessage(reqDoc.message);
+    const lt = legacyPreferredTimeFromMessage(reqDoc.message);
+    if (ld || lt) {
+      preferredDate = ld || preferredDate;
+      preferredTime = lt || preferredTime;
+      studentMessage = legacyPlainMessageFromCombined(reqDoc.message);
+    }
+  }
+
+  if (!preferredDate) preferredDate = '—';
+  if (!preferredTime) preferredTime = '—';
+  if (!studentMessage) studentMessage = '—';
+
+  return { preferredDate, preferredTime, studentMessage };
+}
+
+function validateCalendarDateYyyyMmDd(value) {
+  if (!value || typeof value !== 'string') return 'Date is required.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return 'Date must use a four-digit year (YYYY-MM-DD).';
+  }
+  const [y, m, d] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(y, m - 1, d));
+  if (
+    parsed.getUTCFullYear() !== y ||
+    parsed.getUTCMonth() !== m - 1 ||
+    parsed.getUTCDate() !== d
+  ) {
+    return 'That calendar date is not valid.';
+  }
+  return '';
+}
+
 // Route: POST /api/users/register
 // Create a brand new user in the database
 router.post('/register', async (req, res) => {
@@ -290,10 +354,26 @@ router.get('/tutors/:course', async (req, res) => {
 // Send a tutor request and save the message in the database
 router.post('/request-tutor', async (req, res) => {
   try {
-    const { studentId, tutorId, course, message } = req.body;
+    const {
+      studentId,
+      tutorId,
+      course,
+      message,
+      preferredDate,
+      preferredStartTime,
+      preferredEndTime
+    } = req.body;
 
     if (!studentId || !tutorId || !course) {
       return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const dateErr = validateCalendarDateYyyyMmDd(preferredDate);
+    if (dateErr) {
+      return res.status(400).json({ error: dateErr });
+    }
+    if (!preferredStartTime || !preferredEndTime) {
+      return res.status(400).json({ error: "Preferred start and end time are required." });
     }
 
     const student = await User.findById(studentId);
@@ -303,32 +383,39 @@ router.post('/request-tutor', async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // Check if the student already has a pending request for this specific TA and course
+    // Block only an open (pending) request for the same tutor and course — not accepted/declined
     const alreadyRequested = student.tutorRequests.some(
-      (request) => 
-        request.requestedTutor.toString() === tutorId && 
-        request.course === course && 
-        (request.status === 'pending' || request.status === 'accepted')
+      (request) =>
+        request.requestedTutor.toString() === tutorId &&
+        request.course === course &&
+        request.status === 'pending'
     );
 
     if (alreadyRequested) {
-      return res.status(400).json({ 
-        error: `You already have a pending request with ${tutor.name} for ${course}.` 
+      return res.status(400).json({
+        error: `You already have a pending request with ${tutor.name} for ${course}.`
       });
     }
 
-    // SAVE TO DATABASE 
+    const plainMessage = typeof message === 'string' ? message.trim() : '';
+
     student.tutorRequests.push({
-        course: course,
-        requestedTutor: tutorId,
-        message: message || "No message provided.",
-        status: 'pending'
+      course: course,
+      requestedTutor: tutorId,
+      message: plainMessage,
+      preferredDate: preferredDate.trim(),
+      preferredTimeStart: String(preferredStartTime).trim(),
+      preferredTimeEnd: String(preferredEndTime).trim(),
+      status: 'pending'
     });
     await student.save();
 
-    res.status(200).json({ 
+    const added = student.tutorRequests[student.tutorRequests.length - 1];
+
+    res.status(200).json({
       message: `Successfully sent your request to ${tutor.name}!`,
-      requests: student.tutorRequests 
+      requestId: added._id,
+      requests: student.tutorRequests
     });
 
   } catch (error) {
@@ -338,36 +425,55 @@ router.post('/request-tutor', async (req, res) => {
 });
 
 // Route: GET /api/users/tutor-requests/:tutorId
-// Fetch all pending requests sent to a specific TA
+// Pending and accepted requests for this tutor (declined/cancelled omitted)
 router.get('/tutor-requests/:tutorId', async (req, res) => {
   try {
     const tutorId = req.params.tutorId;
 
-    // Find all students who have a pending request for this tutor
     const students = await User.find(
-      { tutorRequests: { $elemMatch: { requestedTutor: tutorId, status: 'pending' } } },
-      'name email tutorRequests' // Only pull the data we actually need
+      {
+        tutorRequests: {
+          $elemMatch: {
+            requestedTutor: tutorId,
+            status: { $in: ['pending', 'accepted'] }
+          }
+        }
+      },
+      'name email tutorRequests'
     );
 
-    // Clean up the data so the frontend only gets this specific TA's requests
-    let pendingRequests = [];
-    students.forEach(student => {
-      student.tutorRequests.forEach(request => {
-        if (request.requestedTutor.toString() === tutorId && request.status === 'pending') {
-          pendingRequests.push({
+    let tutorRequests = [];
+    students.forEach((student) => {
+      student.tutorRequests.forEach((request) => {
+        if (
+          request.requestedTutor.toString() === tutorId &&
+          (request.status === 'pending' || request.status === 'accepted')
+        ) {
+          const disp = resolveTutorRequestDisplay(request);
+          tutorRequests.push({
             studentId: student._id,
             studentName: student.name,
             studentEmail: student.email,
             requestId: request._id,
             course: request.course,
-            message: request.message,
+            preferredDate: disp.preferredDate,
+            preferredTime: disp.preferredTime,
+            studentMessage: disp.studentMessage,
+            status: request.status,
             createdAt: request.createdAt
           });
         }
       });
     });
 
-    res.status(200).json(pendingRequests);
+    tutorRequests.sort((a, b) => {
+      const rank = (s) => (s === 'pending' ? 0 : 1);
+      const diff = rank(a.status) - rank(b.status);
+      if (diff !== 0) return diff;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    res.status(200).json(tutorRequests);
 
   } catch (error) {
     console.error(error);
@@ -392,6 +498,10 @@ router.put('/tutor-requests/:studentId/:requestId', async (req, res) => {
     // Find the specific request inside the student's array
     const request = student.tutorRequests.id(requestId);
     if (!request) return res.status(404).json({ error: "Request not found." });
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: "This request is no longer pending." });
+    }
 
     // Update the status and save
     request.status = action;
@@ -420,12 +530,16 @@ router.get('/my-tutor-requests/:studentId', async (req, res) => {
     }
 
     // Format the data cleanly
-    const formattedRequests = student.tutorRequests.map(request => {
+    const formattedRequests = student.tutorRequests.map((request) => {
+      const disp = resolveTutorRequestDisplay(request);
       return {
         requestId: request._id,
         tutorName: request.requestedTutor ? request.requestedTutor.name : 'Unknown Tutor',
         course: request.course,
         message: request.message,
+        preferredDate: disp.preferredDate,
+        preferredTime: disp.preferredTime,
+        studentMessage: disp.studentMessage,
         status: request.status,
         createdAt: request.createdAt
       };
@@ -439,6 +553,79 @@ router.get('/my-tutor-requests/:studentId', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch your tutor requests." });
+  }
+});
+
+// Route: DELETE /api/users/my-tutor-requests/:studentId/:requestId
+// Student withdraws a pending tutor request (organizers no longer see it)
+router.delete('/my-tutor-requests/:studentId/:requestId', async (req, res) => {
+  try {
+    const { studentId, requestId } = req.params;
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const request = student.tutorRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ error: "Request not found." });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: "Only pending tutor requests can be cancelled." });
+    }
+
+    request.status = 'cancelled';
+    await student.save();
+
+    res.status(200).json({ message: "Tutor request cancelled." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to cancel tutor request." });
+  }
+});
+
+// Route: PUT /api/users/my-tutor-requests/:studentId/:requestId
+// Student updates an open pending request (date, time, message)
+router.put('/my-tutor-requests/:studentId/:requestId', async (req, res) => {
+  try {
+    const { studentId, requestId } = req.params;
+    const { preferredDate, preferredStartTime, preferredEndTime, message } = req.body;
+
+    const dateErr = validateCalendarDateYyyyMmDd(preferredDate);
+    if (dateErr) {
+      return res.status(400).json({ error: dateErr });
+    }
+    if (!preferredStartTime || !preferredEndTime) {
+      return res.status(400).json({ error: "Preferred start and end time are required." });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const request = student.tutorRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ error: "Request not found." });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: "Only pending tutor requests can be updated." });
+    }
+
+    request.preferredDate = String(preferredDate).trim();
+    request.preferredTimeStart = String(preferredStartTime).trim();
+    request.preferredTimeEnd = String(preferredEndTime).trim();
+    request.message = typeof message === 'string' ? message.trim() : '';
+
+    await student.save();
+
+    res.status(200).json({ message: "Tutor request updated.", requestId: request._id });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update tutor request." });
   }
 });
 
