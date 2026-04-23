@@ -183,6 +183,7 @@
                   <th>Message</th>
                   <th>Status</th>
                   <th>Created at</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="studentTutorRequestsBody"></tbody>
@@ -218,15 +219,30 @@
 
           <div class="simple-page-title">Tutor requests</div>
 
-          <div class="reservation-table-wrapper">
+          <div class="reservation-table-wrapper organizer-tutor-requests-scroll">
             <table class="reservation-table">
+              <colgroup>
+                <col style="width: 8%;" />
+                <col style="width: 17%;" />
+                <col style="width: 8%;" />
+                <col style="width: 8%;" />
+                <col style="width: 9%;" />
+                <col style="width: 11%;" />
+                <col style="width: 10%;" />
+                <col style="width: 8%;" />
+                <col style="width: 11%;" />
+                <col style="width: 10%;" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Student</th>
                   <th>Email</th>
                   <th>Course</th>
+                  <th>Date</th>
+                  <th>Time</th>
                   <th>Message</th>
-                  <th>Requested at</th>
+                  <th>Sent</th>
+                  <th>Status</th>
                   <th>Accept</th>
                   <th>Decline</th>
                 </tr>
@@ -348,7 +364,7 @@
 
             <label>
               Preferred date
-              <input id="requestTutorDate" type="date" required />
+              <input id="requestTutorDate" type="date" min="2000-01-01" max="2099-12-31" required />
             </label>
 
             <label>
@@ -468,7 +484,7 @@
 
             <label>
               Date
-              <input id="examOrganizerDate" type="date" required />
+              <input id="examOrganizerDate" type="date" min="2000-01-01" max="2099-12-31" required />
             </label>
 
             <label>
@@ -509,7 +525,7 @@
 
             <label>
               Date
-              <input id="officeOrganizerDate" type="date" required />
+              <input id="officeOrganizerDate" type="date" min="2000-01-01" max="2099-12-31" required />
             </label>
 
             <label>

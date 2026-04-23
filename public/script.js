@@ -12,6 +12,7 @@ const state = {
   availableTutors: [],
   lastReservation: null,
   modifySessionId: null,
+  editingTutorRequestId: null,
   requestTutorFormData: {
     course: DEFAULT_COURSE,
     preferredDate: "",
@@ -56,28 +57,6 @@ const examReviewOrganizerForm = document.getElementById("examReviewOrganizerForm
 const officeHourOrganizerForm = document.getElementById("officeHourOrganizerForm");
 const requestTutorForm = document.getElementById("requestTutorForm");
 
-function getStudentTutorRequestsStorageKey() {
-  return `unislotTutorRequests_${state.user?.id || "guest"}`;
-}
-
-function getStoredStudentTutorRequests() {
-  try {
-    return JSON.parse(localStorage.getItem(getStudentTutorRequestsStorageKey()) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function setStoredStudentTutorRequests(requests) {
-  localStorage.setItem(getStudentTutorRequestsStorageKey(), JSON.stringify(requests));
-}
-
-function addStoredStudentTutorRequest(request) {
-  const current = getStoredStudentTutorRequests();
-  current.unshift(request);
-  setStoredStudentTutorRequests(current);
-}
-
 function showMessage(text) {
   if (!globalMessage) return;
   globalMessage.textContent = text;
@@ -98,6 +77,19 @@ function capitalizeRole(role) {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
+function capitalizeStatus(status) {
+  if (!status) return "-";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function formatTimestamp(dateString) {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -108,6 +100,44 @@ function formatTimestamp(dateString) {
   const hh = String(date.getHours()).padStart(2, "0");
   const min = String(date.getMinutes()).padStart(2, "0");
   return `${dd}-${mm}-${yyyy} ${hh}:${min}`;
+}
+
+function extractPreferredDate(message) {
+  if (!message) return "-";
+  const match = message.match(/Preferred date:\s*(.+)/i);
+  return match ? match[1].trim() : "-";
+}
+
+function extractPreferredTime(message) {
+  if (!message) return "-";
+  const match = message.match(/Preferred time:\s*(.+)/i);
+  return match ? match[1].trim() : "-";
+}
+
+function extractPlainStudentMessage(message) {
+  if (!message) return "-";
+  const match = message.match(/Message:\s*([\s\S]*)/i);
+  return match ? match[1].trim() : message.trim();
+}
+
+/** Empty string if valid; otherwise an error message. Enforces YYYY-MM-DD with a real calendar date. */
+function validateHtmlDateString(value) {
+  if (!value || typeof value !== "string") {
+    return "Please enter a valid date.";
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "Date must use a four-digit year (YYYY-MM-DD).";
+  }
+  const [y, m, d] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(y, m - 1, d));
+  if (
+    parsed.getUTCFullYear() !== y ||
+    parsed.getUTCMonth() !== m - 1 ||
+    parsed.getUTCDate() !== d
+  ) {
+    return "That calendar date is not valid.";
+  }
+  return "";
 }
 
 function saveUser(user) {
@@ -132,6 +162,7 @@ function logout() {
   state.availableTutors = [];
   state.lastReservation = null;
   state.modifySessionId = null;
+  state.editingTutorRequestId = null;
   state.requestTutorFormData = {
     course: DEFAULT_COURSE,
     preferredDate: "",
@@ -256,7 +287,7 @@ function showAppView(viewId) {
   if (!shouldShowNewReservations(viewId)) toggleSubjectDropdown(false);
 
   if (viewId === "studentHomeView") loadStudentReservations();
-  if (viewId === "studentTutorRequestsView") renderStudentTutorRequests();
+  if (viewId === "studentTutorRequestsView") loadStudentTutorRequests();
   if (viewId === "organizerHomeView") loadOrganizerReservations();
   if (viewId === "organizerTutorRequestsView") loadOrganizerTutorRequests();
   if (viewId === "adminView") loadPendingApplications();
@@ -343,6 +374,10 @@ function renderNewReservationList() {
     btn.innerHTML = `<span>${item.label}</span>`;
     btn.addEventListener("click", () => {
       state.selectedSubject = item.label;
+      if (item.view === "requestTutorStep1View") {
+        state.editingTutorRequestId = null;
+        state.lastReservation = null;
+      }
       renderNewReservationList();
       toggleSubjectDropdown(false);
       showAppView(item.view);
@@ -525,32 +560,74 @@ async function loadStudentReservations() {
   }
 }
 
-function renderStudentTutorRequests() {
+async function loadStudentTutorRequests() {
   if (!studentTutorRequestsBody || !state.user) return;
   studentTutorRequestsBody.innerHTML = "";
 
-  const requests = getStoredStudentTutorRequests();
+  try {
+    const requests = await apiFetch(`/users/my-tutor-requests/${state.user.id}`);
 
-  if (!requests.length) {
+    if (!requests.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="8">No tutor requests yet.</td>`;
+      studentTutorRequestsBody.appendChild(tr);
+      return;
+    }
+
+    requests.forEach((request) => {
+      const tr = document.createElement("tr");
+      const dateCell =
+        request.preferredDate && request.preferredDate !== "—"
+          ? request.preferredDate
+          : extractPreferredDate(request.message);
+      const timeCell =
+        request.preferredTime && request.preferredTime !== "—"
+          ? request.preferredTime
+          : extractPreferredTime(request.message);
+      const msgCell =
+        request.studentMessage && request.studentMessage !== "—"
+          ? request.studentMessage
+          : extractPlainStudentMessage(request.message);
+
+      tr.innerHTML = `
+        <td>${request.tutorName || "-"}</td>
+        <td>${request.course || "-"}</td>
+        <td>${dateCell || "-"}</td>
+        <td>${timeCell || "-"}</td>
+        <td>${msgCell || "-"}</td>
+        <td>${capitalizeStatus(request.status)}</td>
+        <td>${formatTimestamp(request.createdAt)}</td>
+        <td></td>
+      `;
+
+      const actionCell = tr.lastElementChild;
+      if (request.status === "pending") {
+        const cancelBtn = document.createElement("button");
+        cancelBtn.className = "table-action-btn clickable-text";
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.addEventListener("click", async () => {
+          try {
+            await apiFetch(`/users/my-tutor-requests/${state.user.id}/${request.requestId}`, {
+              method: "DELETE"
+            });
+            showMessage("Tutor request cancelled.");
+            await loadStudentTutorRequests();
+          } catch (error) {
+            showMessage(error.message);
+          }
+        });
+        actionCell.appendChild(cancelBtn);
+      } else {
+        actionCell.textContent = "—";
+      }
+
+      studentTutorRequestsBody.appendChild(tr);
+    });
+  } catch (error) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="7">No tutor requests yet.</td>`;
+    tr.innerHTML = `<td colspan="8">${error.message}</td>`;
     studentTutorRequestsBody.appendChild(tr);
-    return;
   }
-
-  requests.forEach((request) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${request.tutorName || "-"}</td>
-      <td>${request.course || "-"}</td>
-      <td>${request.preferredDate || "-"}</td>
-      <td>${request.preferredTime || "-"}</td>
-      <td>${request.message || "-"}</td>
-      <td>${request.status || "Pending"}</td>
-      <td>${request.createdAt || "-"}</td>
-    `;
-    studentTutorRequestsBody.appendChild(tr);
-  });
 }
 
 async function loadOrganizerReservations() {
@@ -587,7 +664,7 @@ async function loadOrganizerTutorRequests() {
 
     if (!requests.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="7">No pending tutor requests.</td>`;
+      tr.innerHTML = `<td colspan="10">No tutor requests yet.</td>`;
       organizerTutorRequestsBody.appendChild(tr);
       return;
     }
@@ -595,65 +672,90 @@ async function loadOrganizerTutorRequests() {
     requests.forEach((request) => {
       const tr = document.createElement("tr");
 
+      const emailRaw = request.studentEmail || "";
+      const emailCell =
+        emailRaw === ""
+          ? "-"
+          : `<td title="${escapeHtml(emailRaw)}">${escapeHtml(emailRaw)}</td>`;
+      const msgRaw = request.studentMessage != null ? String(request.studentMessage) : "";
+      const msgCell = !msgRaw || msgRaw === "—" ? "—" : escapeHtml(msgRaw);
+      const prefDate =
+        request.preferredDate && request.preferredDate !== "—"
+          ? escapeHtml(String(request.preferredDate))
+          : "—";
+      const prefTime =
+        request.preferredTime && request.preferredTime !== "—"
+          ? escapeHtml(String(request.preferredTime))
+          : "—";
+      const statusLabel = capitalizeStatus(request.status || "pending");
+
       tr.innerHTML = `
-        <td>${request.studentName || "-"}</td>
-        <td>${request.studentEmail || "-"}</td>
-        <td>${request.course || "-"}</td>
-        <td>${request.message || "No message provided."}</td>
-        <td>${formatTimestamp(request.createdAt)}</td>
+        <td>${escapeHtml(request.studentName || "-")}</td>
+        ${emailRaw === "" ? "<td>-</td>" : emailCell}
+        <td>${escapeHtml(request.course || "-")}</td>
+        <td>${prefDate}</td>
+        <td>${prefTime}</td>
+        <td>${msgCell}</td>
+        <td>${escapeHtml(formatTimestamp(request.createdAt))}</td>
+        <td>${escapeHtml(statusLabel)}</td>
         <td></td>
         <td></td>
       `;
 
-      const acceptCell = tr.children[5];
-      const declineCell = tr.children[6];
+      const acceptCell = tr.children[8];
+      const declineCell = tr.children[9];
 
-      const acceptBtn = document.createElement("button");
-      acceptBtn.className = "table-action-btn clickable-text";
-      acceptBtn.textContent = "Accept";
-      acceptBtn.addEventListener("click", async () => {
-        try {
-          const result = await apiFetch(
-            `/users/tutor-requests/${request.studentId}/${request.requestId}`,
-            {
-              method: "PUT",
-              body: JSON.stringify({ action: "accepted" })
-            }
-          );
-          showMessage(result.message || "Request accepted.");
-          await loadOrganizerTutorRequests();
-        } catch (error) {
-          showMessage(error.message);
-        }
-      });
+      if (request.status === "pending") {
+        const acceptBtn = document.createElement("button");
+        acceptBtn.className = "table-action-btn clickable-text";
+        acceptBtn.textContent = "Accept";
+        acceptBtn.addEventListener("click", async () => {
+          try {
+            const result = await apiFetch(
+              `/users/tutor-requests/${request.studentId}/${request.requestId}`,
+              {
+                method: "PUT",
+                body: JSON.stringify({ action: "accepted" })
+              }
+            );
+            showMessage(result.message || "Request accepted.");
+            await loadOrganizerTutorRequests();
+          } catch (error) {
+            showMessage(error.message);
+          }
+        });
 
-      const declineBtn = document.createElement("button");
-      declineBtn.className = "table-action-btn clickable-text";
-      declineBtn.textContent = "Decline";
-      declineBtn.addEventListener("click", async () => {
-        try {
-          const result = await apiFetch(
-            `/users/tutor-requests/${request.studentId}/${request.requestId}`,
-            {
-              method: "PUT",
-              body: JSON.stringify({ action: "declined" })
-            }
-          );
-          showMessage(result.message || "Request declined.");
-          await loadOrganizerTutorRequests();
-        } catch (error) {
-          showMessage(error.message);
-        }
-      });
+        const declineBtn = document.createElement("button");
+        declineBtn.className = "table-action-btn clickable-text";
+        declineBtn.textContent = "Decline";
+        declineBtn.addEventListener("click", async () => {
+          try {
+            const result = await apiFetch(
+              `/users/tutor-requests/${request.studentId}/${request.requestId}`,
+              {
+                method: "PUT",
+                body: JSON.stringify({ action: "declined" })
+              }
+            );
+            showMessage(result.message || "Request declined.");
+            await loadOrganizerTutorRequests();
+          } catch (error) {
+            showMessage(error.message);
+          }
+        });
 
-      acceptCell.appendChild(acceptBtn);
-      declineCell.appendChild(declineBtn);
+        acceptCell.appendChild(acceptBtn);
+        declineCell.appendChild(declineBtn);
+      } else {
+        acceptCell.textContent = "—";
+        declineCell.textContent = "—";
+      }
 
       organizerTutorRequestsBody.appendChild(tr);
     });
   } catch (error) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="7">${error.message}</td>`;
+    tr.innerHTML = `<td colspan="10">${error.message}</td>`;
     organizerTutorRequestsBody.appendChild(tr);
   }
 }
@@ -735,18 +837,6 @@ async function loadPendingApplications() {
   } catch (error) {
     pendingApplicationsList.innerHTML = `<div>${error.message}</div>`;
   }
-}
-
-function fillRequestTutorForm() {
-  const course = document.getElementById("requestTutorCourse");
-  const preferredDate = document.getElementById("requestTutorDate");
-  const preferredStartTime = document.getElementById("requestTutorStartTime");
-  const preferredEndTime = document.getElementById("requestTutorEndTime");
-
-  if (course) course.value = state.requestTutorFormData.course || DEFAULT_COURSE;
-  if (preferredDate) preferredDate.value = state.requestTutorFormData.preferredDate || "";
-  if (preferredStartTime) preferredStartTime.value = state.requestTutorFormData.preferredStartTime || "";
-  if (preferredEndTime) preferredEndTime.value = state.requestTutorFormData.preferredEndTime || "";
 }
 
 function renderTutorList() {
@@ -872,13 +962,21 @@ function buildSuccessHtml(title, extraLines = []) {
 function syncSuccessButtons() {
   if (!successCancelBtn || !successModifyBtn) return;
 
-  const hasReservation = !!state.lastReservation;
-  successCancelBtn.disabled = !hasReservation;
-  successModifyBtn.disabled = !hasReservation || state.lastReservation?.mode !== "created";
+  const lr = state.lastReservation;
+  const canCancel = !!lr && (lr.mode === "created" || lr.mode === "joined" || lr.mode === "tutor-request");
+  const canModify = !!lr && (lr.mode === "created" || lr.mode === "tutor-request");
+
+  successCancelBtn.disabled = !canCancel;
+  successModifyBtn.disabled = !canModify;
 }
 
 async function createOrganizerSession({ title, sessionType, course, date, startTime, endTime, location }) {
   const normalizedCourse = normalizeCourse(course || DEFAULT_COURSE);
+
+  const dateErr = validateHtmlDateString(date);
+  if (dateErr) {
+    throw new Error(dateErr);
+  }
 
   const startIso = new Date(`${date}T${startTime}:00`).toISOString();
   const endIso = new Date(`${date}T${endTime}:00`).toISOString();
@@ -903,6 +1001,19 @@ async function cancelLastReservation() {
   if (!state.lastReservation || !state.user) return;
 
   try {
+    if (state.lastReservation.mode === "tutor-request") {
+      await apiFetch(
+        `/users/my-tutor-requests/${state.lastReservation.studentId}/${state.lastReservation.requestId}`,
+        { method: "DELETE" }
+      );
+      showMessage("Tutor request cancelled.");
+      state.lastReservation = null;
+      state.editingTutorRequestId = null;
+      syncSuccessButtons();
+      showAppView("studentHomeView");
+      return;
+    }
+
     if (state.lastReservation.mode === "joined") {
       await apiFetch(`/sessions/${state.lastReservation.sessionId}/leave`, {
         method: "PUT",
@@ -935,7 +1046,26 @@ function openModifyModal(session) {
 }
 
 function openModifyLastReservation() {
-  if (!state.lastReservation || state.lastReservation.mode !== "created") return;
+  if (!state.lastReservation) return;
+
+  if (state.lastReservation.mode === "tutor-request") {
+    const lr = state.lastReservation;
+    state.editingTutorRequestId = lr.requestId;
+    state.requestTutorFormData = {
+      course: lr.course,
+      preferredDate: lr.preferredDate,
+      preferredStartTime: lr.preferredStartTime,
+      preferredEndTime: lr.preferredEndTime
+    };
+    state.selectedTutorId = lr.tutorId;
+    fillRequestTutorForm();
+    const tm = document.getElementById("tutorMessage");
+    if (tm) tm.value = lr.studentMessage || "";
+    showAppView("requestTutorStep1View");
+    return;
+  }
+
+  if (state.lastReservation.mode !== "created") return;
   if (!modifyModal || !modifyLocationInput) return;
   state.modifySessionId = state.lastReservation.sessionId;
   modifyLocationInput.value = state.lastReservation.location || "";
@@ -1148,6 +1278,12 @@ if (requestTutorForm) {
       return;
     }
 
+    const dateProblem = validateHtmlDateString(preferredDate);
+    if (dateProblem) {
+      showMessage(dateProblem);
+      return;
+    }
+
     state.requestTutorFormData = {
       course,
       preferredDate,
@@ -1158,14 +1294,22 @@ if (requestTutorForm) {
     try {
       const tutors = await apiFetch(`/users/tutors/${encodeURIComponent(course)}`);
       state.availableTutors = tutors || [];
-      state.selectedTutorId = null;
+      if (state.editingTutorRequestId && state.lastReservation?.mode === "tutor-request") {
+        state.selectedTutorId = state.lastReservation.tutorId;
+      } else {
+        state.selectedTutorId = null;
+      }
 
       if (!state.availableTutors.length) {
         showMessage(`No approved tutors are available for ${course} right now.`);
         return;
       }
 
-      showAppView("chooseTutorView");
+      if (state.editingTutorRequestId && state.lastReservation?.mode === "tutor-request") {
+        showAppView("tutorMessageView");
+      } else {
+        showAppView("chooseTutorView");
+      }
     } catch (error) {
       showMessage(error.message);
     }
@@ -1199,44 +1343,63 @@ if (submitTutorRequestBtn) {
     const preferredEndTime = state.requestTutorFormData.preferredEndTime;
     const course = state.requestTutorFormData.course || DEFAULT_COURSE;
 
-    const combinedMessage =
-      `Preferred date: ${preferredDate}\n` +
-      `Preferred time: ${preferredStartTime}-${preferredEndTime}\n` +
-      `Message: ${extraMessage || "No message provided."}`;
+    const dateProblem = validateHtmlDateString(preferredDate);
+    if (dateProblem) {
+      showMessage(dateProblem);
+      return;
+    }
+
+    const isEdit = !!state.editingTutorRequestId;
 
     try {
-      const result = await apiFetch("/users/request-tutor", {
-        method: "POST",
-        body: JSON.stringify({
-          studentId: state.user.id,
-          tutorId: state.selectedTutorId,
-          course,
-          message: combinedMessage
-        })
-      });
-
-      const selectedTutor = state.availableTutors.find(
-        (tutor) => String(tutor._id || tutor.id) === String(state.selectedTutorId)
-      );
-
-      addStoredStudentTutorRequest({
-        tutorName: selectedTutor?.name || "Tutor",
-        course,
-        preferredDate,
-        preferredTime: `${preferredStartTime}-${preferredEndTime}`,
-        message: extraMessage || "No message provided.",
-        status: "Pending",
-        createdAt: formatTimestamp(new Date().toISOString())
-      });
+      let result;
+      if (isEdit) {
+        result = await apiFetch(
+          `/users/my-tutor-requests/${state.user.id}/${state.editingTutorRequestId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              preferredDate,
+              preferredStartTime,
+              preferredEndTime,
+              message: extraMessage
+            })
+          }
+        );
+      } else {
+        result = await apiFetch("/users/request-tutor", {
+          method: "POST",
+          body: JSON.stringify({
+            studentId: state.user.id,
+            tutorId: state.selectedTutorId,
+            course,
+            message: extraMessage,
+            preferredDate,
+            preferredStartTime,
+            preferredEndTime
+          })
+        });
+      }
 
       state.latestConfirmation = buildSuccessHtml("Request a tutor", [
         `<div>Requested course: ${course}</div>`,
         `<div>Preferred date: ${preferredDate}</div>`,
         `<div>Preferred time: ${preferredStartTime}-${preferredEndTime}</div>`,
-        `<div>${result.message || "Tutor request sent successfully."}</div>`
+        `<div>${result.message || "Tutor request saved."}</div>`
       ]);
 
-      state.lastReservation = null;
+      state.lastReservation = {
+        mode: "tutor-request",
+        studentId: state.user.id,
+        requestId: isEdit ? state.editingTutorRequestId : result.requestId,
+        tutorId: state.selectedTutorId,
+        course,
+        preferredDate,
+        preferredStartTime,
+        preferredEndTime,
+        studentMessage: extraMessage
+      };
+      state.editingTutorRequestId = null;
       syncSuccessButtons();
       showAppView("successView");
     } catch (error) {

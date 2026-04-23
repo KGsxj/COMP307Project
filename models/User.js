@@ -32,8 +32,11 @@ const userSchema = new mongoose.Schema({
   tutorRequests: [{
     course: { type: String, required: true },
     requestedTutor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    message: { type: String },
-    status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+    message: { type: String, default: '' },
+    preferredDate: { type: String, default: '' },
+    preferredTimeStart: { type: String, default: '' },
+    preferredTimeEnd: { type: String, default: '' },
+    status: { type: String, enum: ['pending', 'accepted', 'declined', 'cancelled'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });

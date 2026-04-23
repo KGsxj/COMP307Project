@@ -364,6 +364,77 @@ textarea {
   font-size: 20px;
 }
 
+/* Organizer tutor requests: full width, readable, never hide cell text behind ellipsis */
+#organizerTutorRequestsView > .simple-page {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#organizerTutorRequestsView .organizer-tutor-requests-scroll {
+  overflow-x: visible;
+  width: 100%;
+  max-width: 100%;
+}
+
+#organizerTutorRequestsView .reservation-table {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+
+#organizerTutorRequestsView .reservation-table th {
+  font-size: 1.125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: visible;
+  overflow-wrap: normal;
+  word-break: normal;
+  padding: 10px 6px;
+  line-height: 1.25;
+}
+
+#organizerTutorRequestsView .reservation-table td {
+  font-size: 1.0625rem;
+  padding: 10px 6px;
+  line-height: 1.4;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+#organizerTutorRequestsView .reservation-table th:nth-child(2) {
+  text-align: center;
+}
+
+#organizerTutorRequestsView .reservation-table td:nth-child(2) {
+  text-align: left;
+}
+
+#organizerTutorRequestsView .reservation-table td:nth-child(6) {
+  text-align: left;
+}
+
+#organizerTutorRequestsView .reservation-table th:nth-child(8),
+#organizerTutorRequestsView .reservation-table td:nth-child(8) {
+  text-align: center;
+}
+
+#organizerTutorRequestsView .reservation-table th:nth-child(9),
+#organizerTutorRequestsView .reservation-table th:nth-child(10),
+#organizerTutorRequestsView .reservation-table td:nth-child(9),
+#organizerTutorRequestsView .reservation-table td:nth-child(10) {
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+#organizerTutorRequestsView .reservation-table .table-action-btn {
+  font-size: 1.0625rem;
+  white-space: nowrap;
+}
+
 .simple-page {
   padding-top: 4px;
 }
