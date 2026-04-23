@@ -166,6 +166,31 @@
         </div>
       </section>
 
+      <section id="studentTutorRequestsView" class="app-view hidden">
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
+          <div class="simple-page-title">My tutor requests</div>
+
+          <div class="reservation-table-wrapper">
+            <table class="reservation-table">
+              <thead>
+                <tr>
+                  <th>Tutor</th>
+                  <th>Course</th>
+                  <th>Preferred date</th>
+                  <th>Preferred time</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                  <th>Created at</th>
+                </tr>
+              </thead>
+              <tbody id="studentTutorRequestsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section id="organizerHomeView" class="app-view hidden">
         <div class="table-title">Ongoing Reservations</div>
 
@@ -184,6 +209,31 @@
             </thead>
             <tbody id="organizerReservationsBody"></tbody>
           </table>
+        </div>
+      </section>
+
+      <section id="organizerTutorRequestsView" class="app-view hidden">
+        <div class="simple-page">
+          <button class="back-home-btn" type="button" data-back-home>Back to home</button>
+
+          <div class="simple-page-title">Tutor requests</div>
+
+          <div class="reservation-table-wrapper">
+            <table class="reservation-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Email</th>
+                  <th>Course</th>
+                  <th>Message</th>
+                  <th>Requested at</th>
+                  <th>Accept</th>
+                  <th>Decline</th>
+                </tr>
+              </thead>
+              <tbody id="organizerTutorRequestsBody"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -290,18 +340,33 @@
 
           <div class="simple-page-title">Request a tutor</div>
 
-          <div class="request-tutor-layout">
-            <div>
-              <div class="calendar-title">Select your desired time slots (up to three)</div>
-              <div id="requestTutorSlots" class="slot-grid"></div>
-            </div>
-          </div>
+          <form id="requestTutorForm" class="create-session-form">
+            <label>
+              Course
+              <input id="requestTutorCourse" type="text" value="COMP307" />
+            </label>
 
-          <div class="confirm-row">
-            <button id="toTutorSelectionBtn" class="small-action-btn" type="button">
-              Confirm
-            </button>
-          </div>
+            <label>
+              Preferred date
+              <input id="requestTutorDate" type="date" required />
+            </label>
+
+            <label>
+              Preferred start time
+              <input id="requestTutorStartTime" type="time" required />
+            </label>
+
+            <label>
+              Preferred end time
+              <input id="requestTutorEndTime" type="time" required />
+            </label>
+
+            <div class="confirm-row">
+              <button id="toTutorSelectionBtn" class="small-action-btn" type="submit">
+                Confirm
+              </button>
+            </div>
+          </form>
         </div>
       </section>
 

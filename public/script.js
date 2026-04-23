@@ -7,24 +7,18 @@ const state = {
   currentView: localStorage.getItem("unislotCurrentView") || "studentHomeView",
   selectedSubject: null,
   selectedTutorId: null,
-  selectedTutorSlots: [],
   latestConfirmation: "",
   availableSessions: [],
   availableTutors: [],
   lastReservation: null,
-  modifySessionId: null
+  modifySessionId: null,
+  requestTutorFormData: {
+    course: DEFAULT_COURSE,
+    preferredDate: "",
+    preferredStartTime: "",
+    preferredEndTime: ""
+  }
 };
-
-const tutorSlots = [
-  "9:00-10:00",
-  "10:00-11:00",
-  "11:00-12:00",
-  "12:00-13:00",
-  "13:00-14:00",
-  "14:00-15:00",
-  "15:00-16:00",
-  "16:00-17:00"
-];
 
 const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
@@ -38,11 +32,12 @@ const dropdownChevron = document.getElementById("dropdownChevron");
 const pageTopLeft = document.getElementById("pageTopLeft");
 
 const studentReservationsBody = document.getElementById("studentReservationsBody");
+const studentTutorRequestsBody = document.getElementById("studentTutorRequestsBody");
 const organizerReservationsBody = document.getElementById("organizerReservationsBody");
+const organizerTutorRequestsBody = document.getElementById("organizerTutorRequestsBody");
 const pendingApplicationsList = document.getElementById("pendingApplicationsList");
 const tutorList = document.getElementById("tutorList");
 const successSummary = document.getElementById("successSummary");
-const requestTutorSlotsEl = document.getElementById("requestTutorSlots");
 
 const examReviewStudentListBody = document.getElementById("examReviewStudentListBody");
 const officeHourStudentListBody = document.getElementById("officeHourStudentListBody");
@@ -59,6 +54,29 @@ const changePasswordBtn = document.getElementById("changePasswordBtn");
 
 const examReviewOrganizerForm = document.getElementById("examReviewOrganizerForm");
 const officeHourOrganizerForm = document.getElementById("officeHourOrganizerForm");
+const requestTutorForm = document.getElementById("requestTutorForm");
+
+function getStudentTutorRequestsStorageKey() {
+  return `unislotTutorRequests_${state.user?.id || "guest"}`;
+}
+
+function getStoredStudentTutorRequests() {
+  try {
+    return JSON.parse(localStorage.getItem(getStudentTutorRequestsStorageKey()) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function setStoredStudentTutorRequests(requests) {
+  localStorage.setItem(getStudentTutorRequestsStorageKey(), JSON.stringify(requests));
+}
+
+function addStoredStudentTutorRequest(request) {
+  const current = getStoredStudentTutorRequests();
+  current.unshift(request);
+  setStoredStudentTutorRequests(current);
+}
 
 function showMessage(text) {
   if (!globalMessage) return;
@@ -78,6 +96,18 @@ function normalizeCourse(course) {
 function capitalizeRole(role) {
   if (!role) return "";
   return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function formatTimestamp(dateString) {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "-";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${dd}-${mm}-${yyyy} ${hh}:${min}`;
 }
 
 function saveUser(user) {
@@ -102,6 +132,12 @@ function logout() {
   state.availableTutors = [];
   state.lastReservation = null;
   state.modifySessionId = null;
+  state.requestTutorFormData = {
+    course: DEFAULT_COURSE,
+    preferredDate: "",
+    preferredStartTime: "",
+    preferredEndTime: ""
+  };
 
   renderApp();
   showAuthView("loginView");
@@ -118,6 +154,7 @@ function inferModeAndView() {
     if (
       ![
         "organizerHomeView",
+        "organizerTutorRequestsView",
         "accountView",
         "examReviewOrganizerView",
         "officeHourOrganizerView",
@@ -131,6 +168,7 @@ function inferModeAndView() {
     if (
       ![
         "studentHomeView",
+        "studentTutorRequestsView",
         "accountView",
         "studentOrganizerRequestView",
         "taRequestView",
@@ -194,6 +232,18 @@ function showAuthView(viewId) {
   });
 }
 
+function fillRequestTutorForm() {
+  const course = document.getElementById("requestTutorCourse");
+  const preferredDate = document.getElementById("requestTutorDate");
+  const preferredStartTime = document.getElementById("requestTutorStartTime");
+  const preferredEndTime = document.getElementById("requestTutorEndTime");
+
+  if (course) course.value = state.requestTutorFormData.course || DEFAULT_COURSE;
+  if (preferredDate) preferredDate.value = state.requestTutorFormData.preferredDate || "";
+  if (preferredStartTime) preferredStartTime.value = state.requestTutorFormData.preferredStartTime || "";
+  if (preferredEndTime) preferredEndTime.value = state.requestTutorFormData.preferredEndTime || "";
+}
+
 function showAppView(viewId) {
   document.querySelectorAll(".app-view").forEach((view) => {
     view.classList.toggle("hidden", view.id !== viewId);
@@ -206,11 +256,13 @@ function showAppView(viewId) {
   if (!shouldShowNewReservations(viewId)) toggleSubjectDropdown(false);
 
   if (viewId === "studentHomeView") loadStudentReservations();
+  if (viewId === "studentTutorRequestsView") renderStudentTutorRequests();
   if (viewId === "organizerHomeView") loadOrganizerReservations();
+  if (viewId === "organizerTutorRequestsView") loadOrganizerTutorRequests();
   if (viewId === "adminView") loadPendingApplications();
   if (viewId === "accountView") renderAccountView();
   if (viewId === "chooseTutorView") renderTutorList();
-  if (viewId === "requestTutorStep1View") renderTutorSlots();
+  if (viewId === "requestTutorStep1View") fillRequestTutorForm();
   if (viewId === "examReviewStudentView") loadAvailableStudentSessions("review");
   if (viewId === "officeHourStudentView") loadAvailableStudentSessions("office-hour");
   if (viewId === "successView" && successSummary) successSummary.innerHTML = state.latestConfirmation;
@@ -232,6 +284,7 @@ function renderTopActionBox() {
 
   if (state.mode === "student") {
     addActionButton("Account", () => showAppView("accountView"));
+    addActionButton("My tutor requests", () => showAppView("studentTutorRequestsView"));
     addActionButton("Request to become an organizer", () => showAppView("studentOrganizerRequestView"));
     addActionButton("Already a TA?", () => showAppView("taRequestView"));
     addActionButton("Logout", logout);
@@ -240,6 +293,7 @@ function renderTopActionBox() {
 
   if (state.mode === "organizer") {
     addActionButton("Account", () => showAppView("accountView"));
+    addActionButton("Tutor requests", () => showAppView("organizerTutorRequestsView"));
     addActionButton("Logout", logout);
   }
 }
@@ -471,6 +525,34 @@ async function loadStudentReservations() {
   }
 }
 
+function renderStudentTutorRequests() {
+  if (!studentTutorRequestsBody || !state.user) return;
+  studentTutorRequestsBody.innerHTML = "";
+
+  const requests = getStoredStudentTutorRequests();
+
+  if (!requests.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="7">No tutor requests yet.</td>`;
+    studentTutorRequestsBody.appendChild(tr);
+    return;
+  }
+
+  requests.forEach((request) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${request.tutorName || "-"}</td>
+      <td>${request.course || "-"}</td>
+      <td>${request.preferredDate || "-"}</td>
+      <td>${request.preferredTime || "-"}</td>
+      <td>${request.message || "-"}</td>
+      <td>${request.status || "Pending"}</td>
+      <td>${request.createdAt || "-"}</td>
+    `;
+    studentTutorRequestsBody.appendChild(tr);
+  });
+}
+
 async function loadOrganizerReservations() {
   if (!organizerReservationsBody || !state.user) return;
   organizerReservationsBody.innerHTML = "";
@@ -493,6 +575,86 @@ async function loadOrganizerReservations() {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="7">${error.message}</td>`;
     organizerReservationsBody.appendChild(tr);
+  }
+}
+
+async function loadOrganizerTutorRequests() {
+  if (!organizerTutorRequestsBody || !state.user) return;
+  organizerTutorRequestsBody.innerHTML = "";
+
+  try {
+    const requests = await apiFetch(`/users/tutor-requests/${state.user.id}`);
+
+    if (!requests.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="7">No pending tutor requests.</td>`;
+      organizerTutorRequestsBody.appendChild(tr);
+      return;
+    }
+
+    requests.forEach((request) => {
+      const tr = document.createElement("tr");
+
+      tr.innerHTML = `
+        <td>${request.studentName || "-"}</td>
+        <td>${request.studentEmail || "-"}</td>
+        <td>${request.course || "-"}</td>
+        <td>${request.message || "No message provided."}</td>
+        <td>${formatTimestamp(request.createdAt)}</td>
+        <td></td>
+        <td></td>
+      `;
+
+      const acceptCell = tr.children[5];
+      const declineCell = tr.children[6];
+
+      const acceptBtn = document.createElement("button");
+      acceptBtn.className = "table-action-btn clickable-text";
+      acceptBtn.textContent = "Accept";
+      acceptBtn.addEventListener("click", async () => {
+        try {
+          const result = await apiFetch(
+            `/users/tutor-requests/${request.studentId}/${request.requestId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({ action: "accepted" })
+            }
+          );
+          showMessage(result.message || "Request accepted.");
+          await loadOrganizerTutorRequests();
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
+
+      const declineBtn = document.createElement("button");
+      declineBtn.className = "table-action-btn clickable-text";
+      declineBtn.textContent = "Decline";
+      declineBtn.addEventListener("click", async () => {
+        try {
+          const result = await apiFetch(
+            `/users/tutor-requests/${request.studentId}/${request.requestId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({ action: "declined" })
+            }
+          );
+          showMessage(result.message || "Request declined.");
+          await loadOrganizerTutorRequests();
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
+
+      acceptCell.appendChild(acceptBtn);
+      declineCell.appendChild(declineBtn);
+
+      organizerTutorRequestsBody.appendChild(tr);
+    });
+  } catch (error) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="7">${error.message}</td>`;
+    organizerTutorRequestsBody.appendChild(tr);
   }
 }
 
@@ -575,37 +737,44 @@ async function loadPendingApplications() {
   }
 }
 
-function renderTutorSlots() {
-  if (!requestTutorSlotsEl) return;
-  requestTutorSlotsEl.innerHTML = "";
+function fillRequestTutorForm() {
+  const course = document.getElementById("requestTutorCourse");
+  const preferredDate = document.getElementById("requestTutorDate");
+  const preferredStartTime = document.getElementById("requestTutorStartTime");
+  const preferredEndTime = document.getElementById("requestTutorEndTime");
 
-  tutorSlots.forEach((slot) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "slot-btn";
-    btn.textContent = slot;
+  if (course) course.value = state.requestTutorFormData.course || DEFAULT_COURSE;
+  if (preferredDate) preferredDate.value = state.requestTutorFormData.preferredDate || "";
+  if (preferredStartTime) preferredStartTime.value = state.requestTutorFormData.preferredStartTime || "";
+  if (preferredEndTime) preferredEndTime.value = state.requestTutorFormData.preferredEndTime || "";
+}
 
-    if (state.selectedTutorSlots.includes(slot)) {
-      btn.classList.add("selected");
-    }
+function renderTutorList() {
+  if (!tutorList) return;
+  tutorList.innerHTML = "";
 
-    btn.addEventListener("click", () => {
-      const index = state.selectedTutorSlots.indexOf(slot);
+  if (!state.availableTutors.length) {
+    tutorList.innerHTML = `<div>No tutors found for ${state.requestTutorFormData.course || DEFAULT_COURSE}.</div>`;
+    return;
+  }
 
-      if (index >= 0) {
-        state.selectedTutorSlots.splice(index, 1);
-      } else {
-        if (state.selectedTutorSlots.length >= 3) {
-          showMessage("You can select up to three time slots.");
-          return;
-        }
-        state.selectedTutorSlots.push(slot);
-      }
+  state.availableTutors.forEach((tutor) => {
+    const tutorId = tutor._id || tutor.id;
+    const card = document.createElement("div");
+    card.className = `tutor-card ${state.selectedTutorId === tutorId ? "selected" : ""}`;
+    card.innerHTML = `
+      <div class="tutor-photo">Tutor</div>
+      <div class="tutor-meta">| Name: ${tutor.name}</div>
+      <div class="tutor-meta">| Responsible Class: ${state.requestTutorFormData.course || DEFAULT_COURSE}</div>
+      <div class="tutor-meta">| Email: ${tutor.email}</div>
+    `;
 
-      renderTutorSlots();
+    card.addEventListener("click", () => {
+      state.selectedTutorId = tutorId;
+      renderTutorList();
     });
 
-    requestTutorSlotsEl.appendChild(btn);
+    tutorList.appendChild(card);
   });
 }
 
@@ -965,21 +1134,34 @@ if (taRequestForm) {
   });
 }
 
-const toTutorSelectionBtn = document.getElementById("toTutorSelectionBtn");
-if (toTutorSelectionBtn) {
-  toTutorSelectionBtn.addEventListener("click", async () => {
-    if (!state.selectedTutorSlots.length) {
-      showMessage("Select at least one time slot.");
+if (requestTutorForm) {
+  requestTutorForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const course = normalizeCourse(document.getElementById("requestTutorCourse").value || DEFAULT_COURSE);
+    const preferredDate = document.getElementById("requestTutorDate").value;
+    const preferredStartTime = document.getElementById("requestTutorStartTime").value;
+    const preferredEndTime = document.getElementById("requestTutorEndTime").value;
+
+    if (!preferredDate || !preferredStartTime || !preferredEndTime) {
+      showMessage("Please fill in all tutor request fields.");
       return;
     }
 
+    state.requestTutorFormData = {
+      course,
+      preferredDate,
+      preferredStartTime,
+      preferredEndTime
+    };
+
     try {
-      const tutors = await apiFetch(`/users/tutors/${encodeURIComponent(DEFAULT_COURSE)}`);
+      const tutors = await apiFetch(`/users/tutors/${encodeURIComponent(course)}`);
       state.availableTutors = tutors || [];
       state.selectedTutorId = null;
 
       if (!state.availableTutors.length) {
-        showMessage("No approved tutors are available for COMP307 right now.");
+        showMessage(`No approved tutors are available for ${course} right now.`);
         return;
       }
 
@@ -987,35 +1169,6 @@ if (toTutorSelectionBtn) {
     } catch (error) {
       showMessage(error.message);
     }
-  });
-}
-
-function renderTutorList() {
-  if (!tutorList) return;
-  tutorList.innerHTML = "";
-
-  if (!state.availableTutors.length) {
-    tutorList.innerHTML = `<div>No tutors found for ${DEFAULT_COURSE}.</div>`;
-    return;
-  }
-
-  state.availableTutors.forEach((tutor) => {
-    const tutorId = tutor._id || tutor.id;
-    const card = document.createElement("div");
-    card.className = `tutor-card ${state.selectedTutorId === tutorId ? "selected" : ""}`;
-    card.innerHTML = `
-      <div class="tutor-photo">Tutor</div>
-      <div class="tutor-meta">| name: ${tutor.name}</div>
-      <div class="tutor-meta">| responsible class: ${DEFAULT_COURSE}</div>
-      <div class="tutor-meta">| email: ${tutor.email}</div>
-    `;
-
-    card.addEventListener("click", () => {
-      state.selectedTutorId = tutorId;
-      renderTutorList();
-    });
-
-    tutorList.appendChild(card);
   });
 }
 
@@ -1034,12 +1187,22 @@ if (toTutorMessageBtn) {
 const submitTutorRequestBtn = document.getElementById("submitTutorRequestBtn");
 if (submitTutorRequestBtn) {
   submitTutorRequestBtn.addEventListener("click", async () => {
-    const message = document.getElementById("tutorMessage").value.trim();
+    const extraMessage = document.getElementById("tutorMessage").value.trim();
 
-    if (!state.selectedTutorSlots.length || !state.selectedTutorId) {
-      showMessage("Choose a tutor and at least one time slot.");
+    if (!state.selectedTutorId) {
+      showMessage("Choose a tutor first.");
       return;
     }
+
+    const preferredDate = state.requestTutorFormData.preferredDate;
+    const preferredStartTime = state.requestTutorFormData.preferredStartTime;
+    const preferredEndTime = state.requestTutorFormData.preferredEndTime;
+    const course = state.requestTutorFormData.course || DEFAULT_COURSE;
+
+    const combinedMessage =
+      `Preferred date: ${preferredDate}\n` +
+      `Preferred time: ${preferredStartTime}-${preferredEndTime}\n` +
+      `Message: ${extraMessage || "No message provided."}`;
 
     try {
       const result = await apiFetch("/users/request-tutor", {
@@ -1047,14 +1210,29 @@ if (submitTutorRequestBtn) {
         body: JSON.stringify({
           studentId: state.user.id,
           tutorId: state.selectedTutorId,
-          course: DEFAULT_COURSE,
-          message
+          course,
+          message: combinedMessage
         })
       });
 
+      const selectedTutor = state.availableTutors.find(
+        (tutor) => String(tutor._id || tutor.id) === String(state.selectedTutorId)
+      );
+
+      addStoredStudentTutorRequest({
+        tutorName: selectedTutor?.name || "Tutor",
+        course,
+        preferredDate,
+        preferredTime: `${preferredStartTime}-${preferredEndTime}`,
+        message: extraMessage || "No message provided.",
+        status: "Pending",
+        createdAt: formatTimestamp(new Date().toISOString())
+      });
+
       state.latestConfirmation = buildSuccessHtml("Request a tutor", [
-        `<div>Requested course: ${DEFAULT_COURSE}</div>`,
-        `<div>Selected time slot(s): ${state.selectedTutorSlots.join(". ")}</div>`,
+        `<div>Requested course: ${course}</div>`,
+        `<div>Preferred date: ${preferredDate}</div>`,
+        `<div>Preferred time: ${preferredStartTime}-${preferredEndTime}</div>`,
         `<div>${result.message || "Tutor request sent successfully."}</div>`
       ]);
 

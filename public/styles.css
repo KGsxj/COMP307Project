@@ -295,7 +295,9 @@ textarea {
 
 .clickable-text:hover,
 .action-box button:hover,
-.table-action-btn:hover {
+.table-action-btn:hover,
+.back-home-btn:hover,
+.small-action-btn:hover {
   text-decoration: underline;
 }
 
@@ -303,14 +305,16 @@ textarea {
 .subject-option:hover,
 .action-box button:hover,
 .dropdown-button:hover,
-.table-action-btn:hover {
+.table-action-btn:hover,
+.back-home-btn:hover,
+.small-action-btn:hover {
   opacity: 0.75;
 }
 
 .action-box {
   margin-left: auto;
-  width: 286px;
-  min-width: 286px;
+  width: 360px;
+  min-width: 360px;
   border: 2px solid var(--border);
   background: transparent;
   padding: 8px 8px 10px;
@@ -352,6 +356,8 @@ textarea {
   text-align: center;
   vertical-align: middle;
   font-weight: 400;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .reservation-table th {
@@ -544,6 +550,8 @@ textarea {
 .tutor-meta {
   font-size: 18px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .create-session-form {
