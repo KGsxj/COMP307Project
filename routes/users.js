@@ -629,4 +629,31 @@ router.put('/my-tutor-requests/:studentId/:requestId', async (req, res) => {
   }
 });
 
+// Route: GET /api/users/:organizerId/approved-courses
+// Fetch a clean list of courses an organizer is approved to show on their account page
+router.get('/:organizerId/approved-courses', async (req, res) => {
+  try {
+    const organizerId = req.params.organizerId;
+    const user = await User.findById(organizerId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (user.role !== 'organizer' && user.role !== 'admin') {
+      return res.status(403).json({ error: "Only organizers have approved courses." });
+    }
+
+    const approvedCourses = user.courseRoles
+      .filter(role => role.status === 'approved')
+      .map(role => role.course); 
+
+    res.status(200).json(approvedCourses);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch approved courses." });
+  }
+});
+
 module.exports = router;
