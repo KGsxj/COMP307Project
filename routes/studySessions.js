@@ -27,6 +27,22 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: "All required fields must be provided to create a session." });
     }
 
+    const sessionStart = new Date(startTime);
+    const sessionEnd = new Date(endTime);
+    const now = new Date();
+
+    // Check if the start time is in the past
+    if (sessionStart < now) {
+      return res.status(400).json({ error: "You cannot create a study session in the past." });
+    }
+
+    // Check if the end time happens before the start time
+    if (sessionEnd <= sessionStart) {
+      return res.status(400).json({ error: "The session end time must be after the start time." });
+    }
+
+    course = course.trim().toUpperCase();
+
     const user = await User.findById(createdBy);
     if (!user) {
       return res.status(404).json({ error: "User not found." });
