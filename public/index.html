@@ -273,6 +273,10 @@
               <div>Name: <span id="accountName"></span></div>
               <div>Role: <span id="accountRole"></span></div>
               <div>Email: <span id="accountEmail"></span></div>
+              <div id="accountOrganizerCoursesRow" class="account-organizer-courses hidden">
+                <div class="account-organizer-courses-label">Registered courses</div>
+                <div id="accountOrganizerCourses" class="account-organizer-courses-list"></div>
+              </div>
               <button id="changePasswordBtn" class="plain-link underlined clickable-text" type="button">
                 Change password
               </button>
@@ -323,7 +327,7 @@
         <div class="simple-page">
           <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="request-title">Request to become an organizer</div>
+          <div class="request-title">Already a TA?</div>
 
           <form id="taRequestForm" class="request-box-form">
             <div class="request-big-box">
@@ -356,7 +360,7 @@
 
           <div class="simple-page-title">Request a tutor</div>
 
-          <form id="requestTutorForm" class="create-session-form">
+          <form id="requestTutorForm" class="create-session-form request-tutor-form-block">
             <label>
               Course
               <input id="requestTutorCourse" type="text" value="COMP307" />
@@ -376,13 +380,13 @@
               Preferred end time
               <input id="requestTutorEndTime" type="time" required />
             </label>
-
-            <div class="confirm-row">
-              <button id="toTutorSelectionBtn" class="small-action-btn" type="submit">
-                Confirm
-              </button>
-            </div>
           </form>
+
+          <div class="confirm-row request-tutor-confirm-outside">
+            <button id="toTutorSelectionBtn" class="small-action-btn" type="submit" form="requestTutorForm">
+              Confirm
+            </button>
+          </div>
         </div>
       </section>
 
@@ -405,18 +409,17 @@
         <div class="simple-page">
           <button class="back-home-btn" type="button" data-back-home>Back to home</button>
 
-          <div class="confirm-row left">
+          <div class="simple-page-title">
+            Message to the tutor (What do you need to reinforce? What are some of your questions?)
+          </div>
+
+          <textarea id="tutorMessage" class="tutor-message-textarea"></textarea>
+
+          <div class="confirm-row tutor-message-confirm-below">
             <button id="submitTutorRequestBtn" class="small-action-btn" type="button">
               Confirm
             </button>
           </div>
-
-          <div class="simple-page-title">
-            Message to the tutor (what do you need to reinforce? What are some of
-            your questions?)
-          </div>
-
-          <textarea id="tutorMessage"></textarea>
         </div>
       </section>
 
@@ -479,7 +482,7 @@
           <form id="examReviewOrganizerForm" class="create-session-form">
             <label>
               Course
-              <input id="examOrganizerCourse" type="text" value="COMP307" />
+              <select id="examOrganizerCourse" class="organizer-course-select" required></select>
             </label>
 
             <label>
@@ -520,7 +523,7 @@
           <form id="officeHourOrganizerForm" class="create-session-form">
             <label>
               Course
-              <input id="officeOrganizerCourse" type="text" value="COMP307" />
+              <select id="officeOrganizerCourse" class="organizer-course-select" required></select>
             </label>
 
             <label>
@@ -562,10 +565,10 @@
             <div id="successSummary" class="success-summary"></div>
 
             <div class="success-card-actions">
-              <button id="successCancelBtn" class="success-action-btn" type="button">
+              <button id="successCancelBtn" class="success-action-btn success-action-outline" type="button">
                 Cancel reservation
               </button>
-              <button id="successModifyBtn" class="success-action-btn" type="button">
+              <button id="successModifyBtn" class="success-action-btn success-action-outline" type="button">
                 Modify reservation
               </button>
             </div>
@@ -574,23 +577,23 @@
       </section>
 
       <section id="adminView" class="app-view hidden">
-        <div class="simple-page">
-          <div class="simple-page-title">*admin page</div>
+        <div class="simple-page admin-page">
+          <div class="simple-page-title">Admin — pending organizer applications</div>
 
-          <div class="admin-grid">
-            <div class="admin-apps">
-              <div class="admin-header-row">
-                <div>Name</div>
-                <div>GPA</div>
-                <div>Approve</div>
-                <div>Decline</div>
-              </div>
-              <div id="pendingApplicationsList"></div>
-            </div>
-
-            <div class="admin-course-box">
-              <div>Pending organizer applications</div>
-            </div>
+          <div class="reservation-table-wrapper admin-applications-wrap">
+            <table class="reservation-table admin-applications-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Course</th>
+                  <th>GPA</th>
+                  <th>Approve</th>
+                  <th>Decline</th>
+                </tr>
+              </thead>
+              <tbody id="pendingApplicationsBody"></tbody>
+            </table>
           </div>
         </div>
       </section>

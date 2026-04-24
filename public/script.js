@@ -21,6 +21,12 @@ const state = {
   }
 };
 
+if (state.user && !Array.isArray(state.user.courseRoles)) {
+  state.user.courseRoles = [];
+}
+
+const ORGANIZER_SURFACE_KEY = "unislotOrganizerSurface";
+
 const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
 const topbarUser = document.getElementById("topbarUser");
@@ -36,7 +42,7 @@ const studentReservationsBody = document.getElementById("studentReservationsBody
 const studentTutorRequestsBody = document.getElementById("studentTutorRequestsBody");
 const organizerReservationsBody = document.getElementById("organizerReservationsBody");
 const organizerTutorRequestsBody = document.getElementById("organizerTutorRequestsBody");
-const pendingApplicationsList = document.getElementById("pendingApplicationsList");
+const pendingApplicationsBody = document.getElementById("pendingApplicationsBody");
 const tutorList = document.getElementById("tutorList");
 const successSummary = document.getElementById("successSummary");
 
@@ -90,6 +96,13 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+function formatGpaTwoDecimals(gpa) {
+  if (gpa === undefined || gpa === null || gpa === "") return "—";
+  const n = Number(gpa);
+  if (Number.isNaN(n)) return "—";
+  return n.toFixed(2);
+}
+
 function formatTimestamp(dateString) {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -140,11 +153,69 @@ function validateHtmlDateString(value) {
   return "";
 }
 
+function getApprovedOrganizerCourses() {
+  const roles = state.user?.courseRoles;
+  if (!Array.isArray(roles)) return [];
+  const list = roles
+    .filter((r) => r.status === "approved")
+    .map((r) => normalizeCourse(r.course))
+    .filter(Boolean);
+  return [...new Set(list)];
+}
+
+function populateOrganizerCourseSelects() {
+  const courses = getApprovedOrganizerCourses();
+  ["examOrganizerCourse", "officeOrganizerCourse"].forEach((id) => {
+    const sel = document.getElementById(id);
+    if (!sel || sel.tagName !== "SELECT") return;
+    const previous = normalizeCourse(sel.value);
+    sel.innerHTML = "";
+    if (!courses.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No approved courses — complete organizer access first";
+      opt.disabled = true;
+      opt.selected = true;
+      sel.appendChild(opt);
+      sel.required = false;
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    sel.required = true;
+    courses.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    });
+    if (previous && courses.includes(previous)) {
+      sel.value = previous;
+    } else {
+      sel.value = courses[0];
+    }
+  });
+}
+
+function mergeUserCourseRolesFromApi(result) {
+  if (result && Array.isArray(result.courseRoles)) {
+    state.user.courseRoles = result.courseRoles;
+    localStorage.setItem("unislotUser", JSON.stringify(state.user));
+    populateOrganizerCourseSelects();
+    if (state.currentView === "accountView") renderAccountView();
+  }
+}
+
 function saveUser(user) {
+  if (!user.courseRoles) user.courseRoles = [];
   state.user = user;
   localStorage.setItem("unislotUser", JSON.stringify(user));
+  if (user.role !== "organizer") {
+    localStorage.removeItem(ORGANIZER_SURFACE_KEY);
+  }
   inferModeAndView();
   renderApp();
+  populateOrganizerCourseSelects();
 }
 
 function persistCurrentView(viewId) {
@@ -155,6 +226,7 @@ function logout() {
   localStorage.removeItem("unislotUser");
   localStorage.removeItem("unislotMode");
   localStorage.removeItem("unislotCurrentView");
+  localStorage.removeItem(ORGANIZER_SURFACE_KEY);
 
   state.user = null;
   state.selectedSubject = null;
@@ -174,6 +246,37 @@ function logout() {
   showAuthView("loginView");
 }
 
+function getOrganizerUiSurface() {
+  return localStorage.getItem(ORGANIZER_SURFACE_KEY) || "organizer";
+}
+
+function setOrganizerUiSurface(surface) {
+  localStorage.setItem(ORGANIZER_SURFACE_KEY, surface);
+}
+
+const STUDENT_APP_VIEWS = [
+  "studentHomeView",
+  "studentTutorRequestsView",
+  "accountView",
+  "studentOrganizerRequestView",
+  "taRequestView",
+  "requestTutorStep1View",
+  "chooseTutorView",
+  "tutorMessageView",
+  "examReviewStudentView",
+  "officeHourStudentView",
+  "successView"
+];
+
+const ORGANIZER_APP_VIEWS = [
+  "organizerHomeView",
+  "organizerTutorRequestsView",
+  "accountView",
+  "examReviewOrganizerView",
+  "officeHourOrganizerView",
+  "successView"
+];
+
 function inferModeAndView() {
   if (!state.user) return;
 
@@ -181,36 +284,15 @@ function inferModeAndView() {
     state.mode = "admin";
     state.currentView = "adminView";
   } else if (state.user.role === "organizer") {
-    state.mode = "organizer";
-    if (
-      ![
-        "organizerHomeView",
-        "organizerTutorRequestsView",
-        "accountView",
-        "examReviewOrganizerView",
-        "officeHourOrganizerView",
-        "successView"
-      ].includes(state.currentView)
-    ) {
-      state.currentView = "organizerHomeView";
+    const surface = getOrganizerUiSurface();
+    state.mode = surface === "student" ? "student" : "organizer";
+    const allowed = state.mode === "student" ? STUDENT_APP_VIEWS : ORGANIZER_APP_VIEWS;
+    if (!allowed.includes(state.currentView)) {
+      state.currentView = state.mode === "student" ? "studentHomeView" : "organizerHomeView";
     }
   } else {
     state.mode = "student";
-    if (
-      ![
-        "studentHomeView",
-        "studentTutorRequestsView",
-        "accountView",
-        "studentOrganizerRequestView",
-        "taRequestView",
-        "requestTutorStep1View",
-        "chooseTutorView",
-        "tutorMessageView",
-        "examReviewStudentView",
-        "officeHourStudentView",
-        "successView"
-      ].includes(state.currentView)
-    ) {
+    if (!STUDENT_APP_VIEWS.includes(state.currentView)) {
       state.currentView = "studentHomeView";
     }
   }
@@ -222,8 +304,16 @@ function inferModeAndView() {
 function getHomeViewForCurrentUser() {
   if (!state.user) return null;
   if (state.user.role === "admin") return "adminView";
-  if (state.user.role === "organizer") return "organizerHomeView";
+  if (state.user.role === "organizer") {
+    return getOrganizerUiSurface() === "student" ? "studentHomeView" : "organizerHomeView";
+  }
   return "studentHomeView";
+}
+
+function canManageHostedSession() {
+  if (!state.user) return false;
+  if (state.user.role === "admin") return true;
+  return state.user.role === "organizer" && state.mode === "organizer";
 }
 
 function shouldShowNewReservations(viewId) {
@@ -261,6 +351,27 @@ function showAuthView(viewId) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle("hidden", id !== viewId);
   });
+
+  if (viewId === "loginView") {
+    const rn = document.getElementById("registerName");
+    const re = document.getElementById("registerEmail");
+    const rp = document.getElementById("registerPassword");
+    if (rn) rn.value = "";
+    if (re) re.value = "";
+    if (rp) rp.value = "";
+  }
+  if (viewId === "registerView") {
+    const le = document.getElementById("loginEmail");
+    const lp = document.getElementById("loginPassword");
+    if (le) le.value = "";
+    if (lp) lp.value = "";
+  }
+  if (viewId === "resetView") {
+    const rem = document.getElementById("resetEmail");
+    const rnp = document.getElementById("resetNewPassword");
+    if (rem) rem.value = "";
+    if (rnp) rnp.value = "";
+  }
 }
 
 function fillRequestTutorForm() {
@@ -275,7 +386,103 @@ function fillRequestTutorForm() {
   if (preferredEndTime) preferredEndTime.value = state.requestTutorFormData.preferredEndTime || "";
 }
 
+function resetExamOrganizerFormFields() {
+  const d = document.getElementById("examOrganizerDate");
+  const st = document.getElementById("examOrganizerStartTime");
+  const en = document.getElementById("examOrganizerEndTime");
+  const loc = document.getElementById("examOrganizerLocation");
+  if (d) d.value = "";
+  if (st) st.value = "";
+  if (en) en.value = "";
+  if (loc) loc.value = "";
+  populateOrganizerCourseSelects();
+}
+
+function resetOfficeOrganizerFormFields() {
+  const d = document.getElementById("officeOrganizerDate");
+  const st = document.getElementById("officeOrganizerStartTime");
+  const en = document.getElementById("officeOrganizerEndTime");
+  const loc = document.getElementById("officeOrganizerLocation");
+  if (d) d.value = "";
+  if (st) st.value = "";
+  if (en) en.value = "";
+  if (loc) loc.value = "";
+  populateOrganizerCourseSelects();
+}
+
+function resetTutorRequestFlowAfterSuccess() {
+  state.requestTutorFormData = {
+    course: DEFAULT_COURSE,
+    preferredDate: "",
+    preferredStartTime: "",
+    preferredEndTime: ""
+  };
+  state.selectedTutorId = null;
+  state.editingTutorRequestId = null;
+  const c = document.getElementById("requestTutorCourse");
+  const d = document.getElementById("requestTutorDate");
+  const st = document.getElementById("requestTutorStartTime");
+  const en = document.getElementById("requestTutorEndTime");
+  const tm = document.getElementById("tutorMessage");
+  if (c) c.value = DEFAULT_COURSE;
+  if (d) d.value = "";
+  if (st) st.value = "";
+  if (en) en.value = "";
+  if (tm) tm.value = "";
+}
+
+/** Clear draft fields when opening a view so leaving and returning does not keep old input. */
+function applyViewReset(viewId) {
+  if (viewId === "studentOrganizerRequestView") {
+    const cl = document.getElementById("organizerRequestClass");
+    const gpa = document.getElementById("organizerRequestGpa");
+    if (cl) cl.value = "";
+    if (gpa) gpa.value = "";
+  }
+  if (viewId === "taRequestView") {
+    const cl = document.getElementById("taRequestClass");
+    const code = document.getElementById("taRequestCode");
+    if (cl) cl.value = "";
+    if (code) code.value = "";
+  }
+  if (viewId === "requestTutorStep1View") {
+    if (state.editingTutorRequestId) {
+      fillRequestTutorForm();
+      return;
+    }
+    state.requestTutorFormData = {
+      course: DEFAULT_COURSE,
+      preferredDate: "",
+      preferredStartTime: "",
+      preferredEndTime: ""
+    };
+    state.selectedTutorId = null;
+    const c = document.getElementById("requestTutorCourse");
+    if (c) c.value = DEFAULT_COURSE;
+    const tm = document.getElementById("tutorMessage");
+    if (tm) tm.value = "";
+    fillRequestTutorForm();
+  }
+  if (viewId === "tutorMessageView") {
+    const tm = document.getElementById("tutorMessage");
+    if (!tm) return;
+    if (state.editingTutorRequestId && state.lastReservation?.mode === "tutor-request") {
+      tm.value = state.lastReservation.studentMessage || "";
+    } else {
+      tm.value = "";
+    }
+  }
+  if (viewId === "examReviewOrganizerView") {
+    resetExamOrganizerFormFields();
+  }
+  if (viewId === "officeHourOrganizerView") {
+    resetOfficeOrganizerFormFields();
+  }
+}
+
 function showAppView(viewId) {
+  applyViewReset(viewId);
+
   document.querySelectorAll(".app-view").forEach((view) => {
     view.classList.toggle("hidden", view.id !== viewId);
   });
@@ -293,9 +500,11 @@ function showAppView(viewId) {
   if (viewId === "adminView") loadPendingApplications();
   if (viewId === "accountView") renderAccountView();
   if (viewId === "chooseTutorView") renderTutorList();
-  if (viewId === "requestTutorStep1View") fillRequestTutorForm();
   if (viewId === "examReviewStudentView") loadAvailableStudentSessions("review");
   if (viewId === "officeHourStudentView") loadAvailableStudentSessions("office-hour");
+  if (viewId === "examReviewOrganizerView" || viewId === "officeHourOrganizerView") {
+    populateOrganizerCourseSelects();
+  }
   if (viewId === "successView" && successSummary) successSummary.innerHTML = state.latestConfirmation;
 
   renderTopActionBox();
@@ -318,6 +527,13 @@ function renderTopActionBox() {
     addActionButton("My tutor requests", () => showAppView("studentTutorRequestsView"));
     addActionButton("Request to become an organizer", () => showAppView("studentOrganizerRequestView"));
     addActionButton("Already a TA?", () => showAppView("taRequestView"));
+    if (state.user.role === "organizer") {
+      addActionButton("Organizer view", () => {
+        setOrganizerUiSurface("organizer");
+        inferModeAndView();
+        showAppView("organizerHomeView");
+      });
+    }
     addActionButton("Logout", logout);
     return;
   }
@@ -325,6 +541,13 @@ function renderTopActionBox() {
   if (state.mode === "organizer") {
     addActionButton("Account", () => showAppView("accountView"));
     addActionButton("Tutor requests", () => showAppView("organizerTutorRequestsView"));
+    if (state.user.role === "organizer") {
+      addActionButton("Student view", () => {
+        setOrganizerUiSurface("student");
+        inferModeAndView();
+        showAppView("studentHomeView");
+      });
+    }
     addActionButton("Logout", logout);
   }
 }
@@ -377,6 +600,7 @@ function renderNewReservationList() {
       if (item.view === "requestTutorStep1View") {
         state.editingTutorRequestId = null;
         state.lastReservation = null;
+        state.selectedTutorId = null;
       }
       renderNewReservationList();
       toggleSubjectDropdown(false);
@@ -482,9 +706,9 @@ function buildReservationRow(session, homeMode = "student") {
 
   const actionCell = tr.lastElementChild;
 
-  if (userIsCreator(session) && (state.user.role === "organizer" || state.user.role === "admin")) {
+  if (userIsCreator(session) && canManageHostedSession()) {
     const cancelBtn = document.createElement("button");
-    cancelBtn.className = "table-action-btn clickable-text";
+    cancelBtn.className = "table-action-btn clickable-text table-action-secondary";
     cancelBtn.textContent = "Cancel";
     cancelBtn.addEventListener("click", async () => {
       try {
@@ -503,7 +727,7 @@ function buildReservationRow(session, homeMode = "student") {
     const divider = document.createTextNode(" / ");
 
     const modifyBtn = document.createElement("button");
-    modifyBtn.className = "table-action-btn clickable-text";
+    modifyBtn.className = "table-action-btn clickable-text table-action-secondary";
     modifyBtn.textContent = "Modify";
     modifyBtn.addEventListener("click", () => openModifyModal(session));
 
@@ -512,7 +736,7 @@ function buildReservationRow(session, homeMode = "student") {
     actionCell.appendChild(modifyBtn);
   } else if (userIsAttendee(session)) {
     const leaveBtn = document.createElement("button");
-    leaveBtn.className = "table-action-btn clickable-text";
+    leaveBtn.className = "table-action-btn clickable-text table-action-secondary";
     leaveBtn.textContent = "Cancel";
     leaveBtn.addEventListener("click", async () => {
       try {
@@ -541,7 +765,7 @@ async function loadStudentReservations() {
 
   try {
     const data = await apiFetch(`/sessions/user/${state.user.id}`);
-    const sessions = data.sessions || [];
+    const sessions = (data.sessions || []).filter((session) => !userIsCreator(session));
 
     if (!sessions.length) {
       const tr = document.createElement("tr");
@@ -603,7 +827,7 @@ async function loadStudentTutorRequests() {
       const actionCell = tr.lastElementChild;
       if (request.status === "pending") {
         const cancelBtn = document.createElement("button");
-        cancelBtn.className = "table-action-btn clickable-text";
+        cancelBtn.className = "table-action-btn clickable-text table-action-secondary";
         cancelBtn.textContent = "Cancel";
         cancelBtn.addEventListener("click", async () => {
           try {
@@ -636,7 +860,7 @@ async function loadOrganizerReservations() {
 
   try {
     const data = await apiFetch(`/sessions/user/${state.user.id}`);
-    const sessions = data.sessions || [];
+    const sessions = (data.sessions || []).filter((session) => userIsCreator(session));
 
     if (!sessions.length) {
       const tr = document.createElement("tr");
@@ -707,7 +931,7 @@ async function loadOrganizerTutorRequests() {
 
       if (request.status === "pending") {
         const acceptBtn = document.createElement("button");
-        acceptBtn.className = "table-action-btn clickable-text";
+        acceptBtn.className = "table-action-btn clickable-text table-action-secondary";
         acceptBtn.textContent = "Accept";
         acceptBtn.addEventListener("click", async () => {
           try {
@@ -726,7 +950,7 @@ async function loadOrganizerTutorRequests() {
         });
 
         const declineBtn = document.createElement("button");
-        declineBtn.className = "table-action-btn clickable-text";
+        declineBtn.className = "table-action-btn clickable-text table-action-secondary";
         declineBtn.textContent = "Decline";
         declineBtn.addEventListener("click", async () => {
           try {
@@ -764,15 +988,30 @@ function renderAccountView() {
   const accountName = document.getElementById("accountName");
   const accountRole = document.getElementById("accountRole");
   const accountEmail = document.getElementById("accountEmail");
+  const coursesRow = document.getElementById("accountOrganizerCoursesRow");
+  const coursesList = document.getElementById("accountOrganizerCourses");
 
   if (accountName) accountName.textContent = state.user.name;
   if (accountRole) accountRole.textContent = capitalizeRole(state.user.role);
   if (accountEmail) accountEmail.textContent = state.user.email;
+
+  if (coursesRow && coursesList) {
+    const approved = getApprovedOrganizerCourses();
+    if (state.user.role === "organizer") {
+      coursesRow.classList.remove("hidden");
+      coursesList.textContent = approved.length
+        ? approved.join(", ")
+        : "No approved courses yet. Use “Request to become an organizer” or “Already a TA?” to gain access.";
+    } else {
+      coursesRow.classList.add("hidden");
+      coursesList.textContent = "";
+    }
+  }
 }
 
 async function loadPendingApplications() {
-  if (!pendingApplicationsList) return;
-  pendingApplicationsList.innerHTML = "";
+  if (!pendingApplicationsBody) return;
+  pendingApplicationsBody.innerHTML = "";
 
   try {
     const pendingUsers = await apiFetch("/users/applications/pending");
@@ -784,6 +1023,7 @@ async function loadPendingApplications() {
           entries.push({
             userId: user._id,
             name: user.name,
+            email: user.email || "—",
             course: role.course,
             gpa: role.gpa
           });
@@ -792,22 +1032,26 @@ async function loadPendingApplications() {
     });
 
     if (!entries.length) {
-      pendingApplicationsList.innerHTML = "<div>No pending applications.</div>";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="6">No pending applications.</td>`;
+      pendingApplicationsBody.appendChild(tr);
       return;
     }
 
     entries.forEach((entry) => {
-      const row = document.createElement("div");
-      row.className = "admin-app-row";
-      row.innerHTML = `
-        <div>${entry.name} (${entry.course})</div>
-        <div>${entry.gpa ?? "-"}</div>
-        <div><button class="plain-link clickable-text">Approve</button></div>
-        <div><button class="plain-link clickable-text">Decline</button></div>
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(entry.name)}</td>
+        <td>${escapeHtml(entry.email)}</td>
+        <td>${escapeHtml(entry.course)}</td>
+        <td>${escapeHtml(formatGpaTwoDecimals(entry.gpa))}</td>
+        <td></td>
+        <td></td>
       `;
 
-      const [approveBtn, declineBtn] = row.querySelectorAll("button");
-
+      const approveBtn = document.createElement("button");
+      approveBtn.className = "table-action-btn clickable-text table-action-secondary";
+      approveBtn.textContent = "Approve";
       approveBtn.addEventListener("click", async () => {
         try {
           await apiFetch(`/users/${entry.userId}/approve/${encodeURIComponent(entry.course)}`, {
@@ -820,6 +1064,9 @@ async function loadPendingApplications() {
         }
       });
 
+      const declineBtn = document.createElement("button");
+      declineBtn.className = "table-action-btn clickable-text table-action-secondary";
+      declineBtn.textContent = "Decline";
       declineBtn.addEventListener("click", async () => {
         try {
           await apiFetch(`/users/${entry.userId}/decline/${encodeURIComponent(entry.course)}`, {
@@ -832,10 +1079,14 @@ async function loadPendingApplications() {
         }
       });
 
-      pendingApplicationsList.appendChild(row);
+      tr.children[4].appendChild(approveBtn);
+      tr.children[5].appendChild(declineBtn);
+      pendingApplicationsBody.appendChild(tr);
     });
   } catch (error) {
-    pendingApplicationsList.innerHTML = `<div>${error.message}</div>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6">${escapeHtml(error.message)}</td>`;
+    pendingApplicationsBody.appendChild(tr);
   }
 }
 
@@ -907,7 +1158,7 @@ async function loadAvailableStudentSessions(sessionType) {
 
       const actionCell = tr.lastElementChild;
       const joinBtn = document.createElement("button");
-      joinBtn.className = "table-action-btn clickable-text";
+      joinBtn.className = "table-action-btn clickable-text table-action-secondary";
       joinBtn.textContent = "Join";
 
       joinBtn.addEventListener("click", async () => {
@@ -1010,7 +1261,7 @@ async function cancelLastReservation() {
       state.lastReservation = null;
       state.editingTutorRequestId = null;
       syncSuccessButtons();
-      showAppView("studentHomeView");
+      showAppView(getHomeViewForCurrentUser());
       return;
     }
 
@@ -1022,7 +1273,7 @@ async function cancelLastReservation() {
       showMessage("Reservation cancelled.");
       state.lastReservation = null;
       syncSuccessButtons();
-      showAppView("studentHomeView");
+      showAppView(getHomeViewForCurrentUser());
       return;
     }
 
@@ -1095,7 +1346,7 @@ async function saveModifyModal() {
     showMessage("Reservation modified.");
     closeModifyModal();
 
-    if (state.mode === "organizer") {
+    if (canManageHostedSession()) {
       await loadOrganizerReservations();
     } else {
       await loadStudentReservations();
@@ -1225,7 +1476,10 @@ if (organizerRequestForm) {
       });
 
       showMessage(result.message || "Application submitted.");
-      showAppView("studentHomeView");
+      mergeUserCourseRolesFromApi(result);
+      document.getElementById("organizerRequestClass").value = "";
+      document.getElementById("organizerRequestGpa").value = "";
+      showAppView(getHomeViewForCurrentUser());
     } catch (error) {
       showMessage(error.message);
     }
@@ -1252,10 +1506,15 @@ if (taRequestForm) {
 
       if (result.message && result.message.includes("Organizer")) {
         state.user.role = "organizer";
-        localStorage.setItem("unislotUser", JSON.stringify(state.user));
+        mergeUserCourseRolesFromApi(result);
+        setOrganizerUiSurface("organizer");
         inferModeAndView();
+      } else {
+        mergeUserCourseRolesFromApi(result);
       }
 
+      document.getElementById("taRequestClass").value = "";
+      document.getElementById("taRequestCode").value = "";
       showMessage(result.message || "TA request submitted.");
       showAppView(getHomeViewForCurrentUser());
     } catch (error) {
@@ -1401,6 +1660,7 @@ if (submitTutorRequestBtn) {
       };
       state.editingTutorRequestId = null;
       syncSuccessButtons();
+      resetTutorRequestFlowAfterSuccess();
       showAppView("successView");
     } catch (error) {
       showMessage(error.message);
@@ -1436,6 +1696,7 @@ if (examReviewOrganizerForm) {
       ]);
 
       syncSuccessButtons();
+      resetExamOrganizerFormFields();
       showAppView("successView");
       await loadOrganizerReservations();
     } catch (error) {
@@ -1472,6 +1733,7 @@ if (officeHourOrganizerForm) {
       ]);
 
       syncSuccessButtons();
+      resetOfficeOrganizerFormFields();
       showAppView("successView");
       await loadOrganizerReservations();
     } catch (error) {

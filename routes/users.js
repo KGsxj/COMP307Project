@@ -49,6 +49,12 @@ function resolveTutorRequestDisplay(reqDoc) {
   return { preferredDate, preferredTime, studentMessage };
 }
 
+function normalizeGpaForStorage(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return NaN;
+  return Math.round(n * 100) / 100;
+}
+
 function validateCalendarDateYyyyMmDd(value) {
   if (!value || typeof value !== 'string') return 'Date is required.';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -156,15 +162,14 @@ router.put('/:id/apply', async (req, res) => {
         // 2. It is correct! Give them the VIP Pass.
         initialStatus = 'approved';
         user.role = 'organizer';
-        finalGpa = 4.0; // Completely ignore whatever they typed in the GPA field
+        finalGpa = normalizeGpaForStorage(4.0);
     } else {
         // No code provided, so they are a student. They MUST have a GPA.
         if (gpa === undefined || gpa === null || gpa === "") {
             return res.status(400).json({ error: "GPA is required for student applications." });
         }
-        // Ensure what they typed is actually a number
-        finalGpa = Number(gpa);
-        if (isNaN(finalGpa)) {
+        finalGpa = normalizeGpaForStorage(gpa);
+        if (Number.isNaN(finalGpa)) {
             return res.status(400).json({ error: "GPA must be a valid number." });
         }
     }
@@ -313,13 +318,18 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: "Incorrect password." });
     }
 
-    res.status(200).json({ 
-      message: "✅ Login successful!", 
+    res.status(200).json({
+      message: "✅ Login successful!",
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        courseRoles: (user.courseRoles || []).map((r) => ({
+          course: r.course,
+          status: r.status,
+          gpa: r.gpa
+        }))
       }
     });
 
