@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
 // Allow a user to create a new study group
 router.post('/', async (req, res) => {
   try {
-    const { title, course, sessionType, startTime, endTime, location, createdBy } = req.body;
+    let { title, course, sessionType, startTime, endTime, location, createdBy } = req.body;
 
     if (!title || !course || !startTime || !endTime || !location || !createdBy) {
       return res.status(400).json({ error: "All required fields must be provided to create a session." });
