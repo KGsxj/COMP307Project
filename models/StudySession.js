@@ -21,7 +21,8 @@ const studySessionSchema = new mongoose.Schema({
   },
   endTime: { 
     type: Date, 
-    required: true 
+    required: true,
+    expires: 0
   },
   location: { 
     type: String, 
