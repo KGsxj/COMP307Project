@@ -1,10 +1,23 @@
 :root {
-  --page-bg: #e3e3e3;
-  --header-red: #ff1d1d;
-  --text: #111111;
-  --border: #222222;
-  --slot-border: #63a8dc;
-  --slot-fill: #55afe3;
+  /* Neutrals & surfaces (calmer than flat gray + harsh black borders) */
+  --page-bg: #e8ebef;
+  --surface: #ffffff;
+  --surface-muted: #f3f5f7;
+  --text: #1a1d24;
+  --text-muted: #4b5363;
+  --border: #9aa3b2;
+  --border-subtle: #d0d5dd;
+  /* Header: deep crimson (not the old flat #ff1d1d) */
+  --header-bg: #b91c1c;
+  --header-bg-end: #7f1d1d;
+  --header-fg: #fef2f2;
+  --header-brand: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --slot-border: #5c7a9a;
+  --slot-fill: #d3e0ed;
+  --accent: #2563eb;
+  --accent-soft: #e8effc;
 }
 
 * {
@@ -18,7 +31,8 @@ body {
   min-height: 100%;
   background: var(--page-bg);
   color: var(--text);
-  font-family: "Aptos", "Aptos (Body)", Calibri, Arial, sans-serif;
+  font-family: system-ui, "Segoe UI", "Aptos", Calibri, Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
@@ -36,19 +50,21 @@ body {
 
 .topbar {
   height: 138px;
-  background: var(--header-red);
+  background: linear-gradient(165deg, var(--header-bg) 0%, var(--header-bg-end) 100%);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   padding: 24px 34px 18px 48px;
+  box-shadow: 0 4px 14px rgba(127, 29, 29, 0.25);
 }
 
 .brand-word {
-  font-family: "Berlin Sans FB", "Berlin Sans FB Demi", "Arial Black", sans-serif;
+  font-family: "Berlin Sans FB", "Berlin Sans FB Demi", "Arial Black", system-ui, sans-serif;
   font-size: 46px;
   line-height: 1;
-  color: #000;
+  color: var(--header-brand);
   margin-top: 18px;
+  letter-spacing: -0.02em;
 }
 
 .brand-button {
@@ -64,7 +80,7 @@ body {
 }
 
 .brand-button:focus {
-  outline: 2px solid #666;
+  outline: 2px solid rgba(255, 255, 255, 0.5);
   outline-offset: 4px;
 }
 
@@ -73,6 +89,7 @@ body {
   align-items: center;
   gap: 12px;
   font-size: 20px;
+  color: var(--header-fg);
 }
 
 .topbar-avatar-img {
@@ -81,14 +98,19 @@ body {
   object-fit: cover;
   border: 0;
   display: block;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
 .message {
   max-width: 1100px;
   margin: 14px auto 0;
   padding: 10px 14px;
-  border: 1px solid var(--border);
-  background: #fff;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
 }
 
 .auth-shell {
@@ -125,10 +147,24 @@ textarea,
 .create-session-form input {
   width: 100%;
   min-height: 56px;
-  border: 2px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
   padding: 8px 10px;
   font: inherit;
+  border-radius: 4px;
+  color: var(--text);
+  box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.login-form input:focus,
+textarea:focus,
+.modal-field input:focus,
+.create-session-form input:focus,
+.organizer-course-select:focus {
+  outline: none;
+  border-color: #7c9bc4;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 textarea {
@@ -141,7 +177,7 @@ textarea {
   background: transparent;
   border: 0;
   padding: 0;
-  color: #000;
+  color: var(--accent);
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -161,22 +197,27 @@ textarea {
 .small-action-btn {
   min-width: 104px;
   min-height: 44px;
-  border: 2px solid var(--border);
-  background: transparent;
-  color: #000;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   font-size: 22px;
   cursor: pointer;
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .back-home-btn {
   min-width: 150px;
   min-height: 44px;
-  border: 2px solid var(--border);
-  background: transparent;
-  color: #000;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   font-size: 20px;
   cursor: pointer;
   margin-bottom: 18px;
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
 }
 
 .reset-sent-text {
@@ -212,19 +253,26 @@ textarea {
 .table-title,
 .simple-page-title {
   font-size: 26px;
-  font-weight: 400;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
   margin-bottom: 10px;
 }
 
 .list-page-subtitle {
   font-size: 22px;
   margin-bottom: 18px;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .dropdown-card {
   width: 255px;
-  border: 2px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .dropdown-button {
@@ -240,8 +288,9 @@ textarea {
   justify-content: space-between;
   align-items: center;
   padding: 8px 10px;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 20px;
+  color: var(--text-muted);
 }
 
 .dropdown-list {
@@ -260,7 +309,8 @@ textarea {
   text-align: left;
   cursor: pointer;
   font-size: 20px;
-  color: #000;
+  color: var(--text);
+  border-radius: 3px;
 }
 
 .subject-option::before {
@@ -277,7 +327,8 @@ textarea {
 }
 
 .subject-option.selected span {
-  background: #bcbcbc;
+  background: #d4dae3;
+  color: var(--text);
 }
 
 .subject-option:hover span,
@@ -301,13 +352,18 @@ textarea {
   text-decoration: underline;
 }
 
+.back-home-btn:hover,
+.small-action-btn:hover {
+  background: var(--surface-muted);
+  border-color: #8b95a5;
+  opacity: 1;
+}
+
 .clickable-text:hover,
 .subject-option:hover,
 .action-box button:hover,
 .dropdown-button:hover,
-.table-action-btn:hover,
-.back-home-btn:hover,
-.small-action-btn:hover {
+.table-action-btn:hover {
   opacity: 0.75;
 }
 
@@ -315,9 +371,11 @@ textarea {
   margin-left: auto;
   width: 360px;
   min-width: 360px;
-  border: 2px solid var(--border);
-  background: transparent;
-  padding: 8px 8px 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
+  padding: 10px 12px 12px;
   display: grid;
   gap: 4px;
 }
@@ -327,7 +385,7 @@ textarea {
   border: 0;
   padding: 0;
   text-align: left;
-  color: #000;
+  color: var(--text);
   font: inherit;
 }
 
@@ -335,7 +393,7 @@ textarea {
   background: transparent;
   border: 0;
   padding: 0;
-  color: #000;
+  color: var(--text);
   font: inherit;
 }
 
@@ -351,17 +409,21 @@ textarea {
 
 .reservation-table th,
 .reservation-table td {
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-subtle);
   padding: 12px 10px;
   text-align: center;
   vertical-align: middle;
   font-weight: 400;
   overflow-wrap: anywhere;
   word-break: break-word;
+  background: var(--surface);
 }
 
 .reservation-table th {
   font-size: 20px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* Organizer tutor requests: full width, readable, never hide cell text behind ellipsis */
@@ -485,7 +547,10 @@ textarea {
   width: 100%;
   max-width: 1140px;
   margin: 0 auto;
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
   padding: 18px 20px;
   font-size: 22px;
   display: grid;
@@ -532,13 +597,15 @@ textarea {
 .big-confirm-btn {
   min-width: 150px;
   min-height: 48px;
-  border: 2px solid var(--border);
-  border-radius: 12px;
-  background: transparent;
-  color: #000;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
   font-size: 26px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .request-tutor-layout {
@@ -562,15 +629,18 @@ textarea {
 
 .slot-btn {
   min-height: 64px;
-  border: 3px solid var(--slot-border);
-  border-radius: 12px;
-  background: transparent;
+  border: 1px solid var(--slot-border);
+  border-radius: 10px;
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 8px 10px;
   font: inherit;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .slot-btn.selected {
@@ -602,14 +672,16 @@ textarea {
 }
 
 .tutor-card.selected {
-  outline: 2px solid var(--border);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
 }
 
 .tutor-photo {
   width: 100%;
   min-height: 120px;
-  border: 1px solid #999;
-  background: #fff;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -642,9 +714,10 @@ textarea {
   font: inherit;
   font-size: 18px;
   padding: 6px 10px;
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .account-organizer-courses {
@@ -666,7 +739,9 @@ textarea {
   width: 100%;
   max-width: 1110px;
   margin: 18px auto 0;
-  border: 3px solid var(--border);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
   border-radius: 110px;
   padding: 32px 70px 42px;
   min-height: 520px;
@@ -699,10 +774,14 @@ textarea {
 .success-action-btn {
   min-width: 400px;
   min-height: 60px;
-  border: 3px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
   font-size: 26px;
   cursor: pointer;
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .success-action-btn:disabled {
@@ -711,20 +790,21 @@ textarea {
 }
 
 .success-action-btn.success-action-outline:not(:disabled) {
-  color: #1e6bb8;
-  border-color: #6eb3f0;
-  background: #eef7ff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: var(--accent-soft);
 }
 
 .success-action-btn.success-action-outline:not(:disabled):hover {
-  background: #e0f0ff;
+  background: #dbeafe;
 }
 
 .request-tutor-form-block {
-  border: 2px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
   padding: 18px 20px 20px;
-  background: #fafafa;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .request-tutor-confirm-outside {
@@ -740,9 +820,11 @@ textarea {
   padding: 12px;
   font: inherit;
   font-size: 18px;
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   box-sizing: border-box;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .tutor-message-confirm-below {
@@ -751,7 +833,7 @@ textarea {
 }
 
 .table-action-secondary:not(:disabled) {
-  color: #1e6bb8;
+  color: var(--accent);
 }
 
 .table-action-secondary:not(:disabled):hover {
@@ -815,7 +897,7 @@ textarea {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(15, 23, 42, 0.45);
   display: grid;
   place-items: center;
   padding: 20px;
@@ -824,8 +906,10 @@ textarea {
 .modal-card {
   width: 100%;
   max-width: 520px;
-  background: #f5f5f5;
-  border: 2px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
   padding: 22px;
 }
 

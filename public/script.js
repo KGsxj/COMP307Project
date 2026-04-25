@@ -277,6 +277,8 @@ const ORGANIZER_APP_VIEWS = [
   "successView"
 ];
 
+
+// Decides what surface a user gets
 function inferModeAndView() {
   if (!state.user) return;
 
@@ -431,7 +433,7 @@ function resetTutorRequestFlowAfterSuccess() {
   if (tm) tm.value = "";
 }
 
-/** Clear draft fields when opening a view so leaving and returning does not keep old input. */
+// Clear draft fields when opening a view so leaving and returning does not keep old input
 function applyViewReset(viewId) {
   if (viewId === "studentOrganizerRequestView") {
     const cl = document.getElementById("organizerRequestClass");
@@ -480,6 +482,7 @@ function applyViewReset(viewId) {
   }
 }
 
+// Every time the UI should change to a different "page", function is called
 function showAppView(viewId) {
   applyViewReset(viewId);
 
@@ -512,6 +515,7 @@ function showAppView(viewId) {
   syncSuccessButtons();
 }
 
+// Builds the top action menu dynamically
 function renderTopActionBox() {
   if (!topActionBox) return;
   topActionBox.innerHTML = "";
@@ -759,6 +763,7 @@ function buildReservationRow(session, homeMode = "student") {
   return tr;
 }
 
+// Fetches sessions from /sessions/user/:id
 async function loadStudentReservations() {
   if (!studentReservationsBody || !state.user) return;
   studentReservationsBody.innerHTML = "";
@@ -784,6 +789,7 @@ async function loadStudentReservations() {
   }
 }
 
+// 
 async function loadStudentTutorRequests() {
   if (!studentTutorRequestsBody || !state.user) return;
   studentTutorRequestsBody.innerHTML = "";
@@ -854,6 +860,7 @@ async function loadStudentTutorRequests() {
   }
 }
 
+// 
 async function loadOrganizerReservations() {
   if (!organizerReservationsBody || !state.user) return;
   organizerReservationsBody.innerHTML = "";
