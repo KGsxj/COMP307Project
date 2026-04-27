@@ -1,3 +1,4 @@
+// Xiejun Shen
 const mongoose = require('mongoose');
 
 const studySessionSchema = new mongoose.Schema({
