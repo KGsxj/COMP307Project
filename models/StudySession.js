@@ -1,4 +1,4 @@
-// Xiejun Shen
+// Ruihan Zhang
 const mongoose = require('mongoose');
 
 const studySessionSchema = new mongoose.Schema({
