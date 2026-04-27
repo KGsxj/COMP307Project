@@ -42,6 +42,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: "The session end time must be after the start time." });
     }
 
+    // Clean up the course code so checks work even if user types weird spacing/case
     course = course.trim().toUpperCase();
 
     const user = await User.findById(createdBy);
@@ -49,12 +50,13 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // Global Role Check
+    // First check: only organizer/admin users can create sessions
     if (user.role !== 'organizer' && user.role !== 'admin') {
       return res.status(403).json({ error: "Only approved organizers can create sessions." });
     }
 
     if (user.role === 'organizer') {
+      // Second check: organizer must be approved for this specific course
       const isApprovedForCourse = user.courseRoles.some(
         r => r.course === course && r.status === 'approved'
       );
@@ -67,7 +69,7 @@ router.post('/', async (req, res) => {
     }
 
 
-    // Check if the exact time slot is already taken by this TA
+    // Avoid double booking (same organizer busy OR same room already used at that time)
     const existingSession = await StudySession.findOne({
       startTime: startTime,
       $or: [
@@ -118,6 +120,7 @@ router.put('/:id', async (req, res) => {
     const sessionId = req.params.id;
     const { startTime, endTime, location } = req.body;
 
+    // Only allow safe fields to be edited
     const safeUpdates = {};
     if (startTime) safeUpdates.startTime = startTime;
     if (endTime) safeUpdates.endTime = endTime;
@@ -201,6 +204,7 @@ router.put('/:id/join', async (req, res) => {
       return res.status(404).json({ error: "Study session not found." });
     }
 
+    // Don't let the same user join twice
     const isAlreadyRegistered = sessionExists.attendees.some(id => id.toString() === userId);
     if (isAlreadyRegistered) {
       return res.status(400).json({ error: "You are already registered for this session." });

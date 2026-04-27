@@ -10,6 +10,8 @@ const studySessionSchema = new mongoose.Schema({
     type: String, 
     required: true // e.g., "COMP307"
   },
+
+  // Keep session type limited so random values don't get saved
   sessionType: {
     type: String,
     enum: ['review', 'office-hour'],
@@ -23,6 +25,7 @@ const studySessionSchema = new mongoose.Schema({
   endTime: { 
     type: Date, 
     required: true,
+    // Auto-delete this session once it reaches endTime
     expires: 0
   },
   location: { 
@@ -40,6 +43,7 @@ const studySessionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
   }]
+// Mongoose auto-adds createdAt and updatedAt for me
 }, { timestamps: true });
 
 module.exports = mongoose.model('StudySession', studySessionSchema);
