@@ -50,11 +50,13 @@ body {
 
 .topbar {
   height: 138px;
+  width: 100%;
   background: linear-gradient(165deg, var(--header-bg) 0%, var(--header-bg-end) 100%);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  padding: 24px 34px 18px 48px;
+  padding: 22px 34px 22px 48px;
+  box-sizing: border-box;
   box-shadow: 0 4px 14px rgba(127, 29, 29, 0.25);
 }
 
@@ -63,7 +65,7 @@ body {
   font-size: 46px;
   line-height: 1;
   color: var(--header-brand);
-  margin-top: 18px;
+  margin: 0;
   letter-spacing: -0.02em;
 }
 
@@ -90,6 +92,7 @@ body {
   gap: 12px;
   font-size: 20px;
   color: var(--header-fg);
+  flex-shrink: 0;
 }
 
 .topbar-avatar-img {
